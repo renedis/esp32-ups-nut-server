@@ -3,7 +3,7 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
-#include "apc_ups.h"
+#include "ups_driver.h"
 #include "nvs_config.h"
 #include "mqtt_pub.h"
 #include "web_server.h"
@@ -48,7 +48,7 @@ static esp_err_t handle_config_page(httpd_req_t *req)
 static esp_err_t handle_api_status(httpd_req_t *req)
 {
     ups_data_t d;
-    apc_ups_get_data(&d);
+    ups_driver_get_data(&d);
     const nvs_cfg_t *cfg = nvs_config_get();
 
     cJSON *root = cJSON_CreateObject();

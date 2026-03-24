@@ -1,5 +1,5 @@
 #include "nut_server.h"
-#include "apc_ups.h"
+#include "ups_driver.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -41,8 +41,9 @@ static void handle_list_ups(int fd)
 {
     client_sendf(fd,
         "BEGIN LIST UPS\n"
-        "UPS " UPS_NAME " \"APC Back-UPS\"\n"
-        "END LIST UPS\n");
+        "UPS " UPS_NAME " \"%s\"\n"
+        "END LIST UPS\n",
+        ups_driver_get_ups_name());
 }
 
 static void handle_list_var(int fd, const char *ups_name)
@@ -53,7 +54,7 @@ static void handle_list_var(int fd, const char *ups_name)
     }
     char buf[TX_BUF_SIZE];
     client_sendf(fd, "BEGIN LIST VAR " UPS_NAME "\n");
-    apc_ups_list_vars(buf, sizeof(buf));
+    ups_driver_list_vars(buf, sizeof(buf));
     send(fd, buf, strlen(buf), 0);
     client_sendf(fd, "END LIST VAR " UPS_NAME "\n");
 }
@@ -123,7 +124,7 @@ static void process_line(nut_client_t *client, char *line)
             if (strcmp(tokens[2], UPS_NAME) != 0) {
                 client_sendf(fd, "ERR UNKNOWN-UPS\n"); return;
             }
-            const char *val = apc_ups_get_var(tokens[3]);
+            const char *val = ups_driver_get_var(tokens[3]);
             if (!val) { client_sendf(fd, "ERR VAR-NOT-SUPPORTED\n"); return; }
             client_sendf(fd, "VAR " UPS_NAME " %s \"%s\"\n", tokens[3], val);
 
@@ -132,7 +133,7 @@ static void process_line(nut_client_t *client, char *line)
             if (strcmp(tokens[2], UPS_NAME) != 0) {
                 client_sendf(fd, "ERR UNKNOWN-UPS\n"); return;
             }
-            const char *val = apc_ups_get_var(tokens[3]);
+            const char *val = ups_driver_get_var(tokens[3]);
             if (!val) { client_sendf(fd, "ERR VAR-NOT-SUPPORTED\n"); return; }
             client_sendf(fd, "TYPE " UPS_NAME " %s STRING:64\n", tokens[3]);
 

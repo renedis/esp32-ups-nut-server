@@ -2,7 +2,8 @@ idf_component_register(
     SRCS
         "main.c"
         "hid_parser.c"
-        "apc_ups.c"
+        "ups_driver.c"
+        "apc_subdriver.c"
         "nut_server.c"
         "nvs_config.c"
         "web_server.c"

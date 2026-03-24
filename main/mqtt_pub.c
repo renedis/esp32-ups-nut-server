@@ -7,7 +7,7 @@
 #include "esp_task_wdt.h"
 #include "mqtt_client.h"
 #include "cJSON.h"
-#include "apc_ups.h"
+#include "ups_driver.h"
 #include "nvs_config.h"
 #include "mqtt_pub.h"
 
@@ -87,7 +87,7 @@ static void publish_ha_discovery(const char *prefix, const char *ups_name,
 static void publish_data(const char *prefix, uint8_t qos)
 {
     ups_data_t d;
-    apc_ups_get_data(&d);
+    ups_driver_get_data(&d);
 
     char topic[128], val[32];
 

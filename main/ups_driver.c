@@ -12,6 +12,11 @@ extern const ups_subdriver_t powervar_subdriver;
 extern const ups_subdriver_t salicru_subdriver;
 extern const ups_subdriver_t delta_subdriver;
 extern const ups_subdriver_t ever_subdriver;
+extern const ups_subdriver_t arduino_subdriver;
+extern const ups_subdriver_t idowell_subdriver;
+extern const ups_subdriver_t legrand_subdriver;
+extern const ups_subdriver_t openups_subdriver;
+extern const ups_subdriver_t ecoflow_subdriver;
 #include <string.h>
 #include <stdio.h>
 #include "esp_log.h"
@@ -46,6 +51,11 @@ static const ups_subdriver_t *s_subdriver_list[] = {
     &salicru_subdriver,
     &delta_subdriver,
     &ever_subdriver,
+    &arduino_subdriver,
+    &idowell_subdriver,
+    &legrand_subdriver,
+    &openups_subdriver,
+    &ecoflow_subdriver,
     NULL   /* sentinel */
 };
 

@@ -1,0 +1,68 @@
+menu "APC NUT Server Configuration"
+
+    choice APC_NUT_BOARD
+        prompt "Target board"
+        default APC_NUT_BOARD_ESP32P4_ETH
+        help
+            Select the hardware platform.
+
+        config APC_NUT_BOARD_ESP32S3
+            bool "ESP32-S3 (WiFi)"
+            help
+                Generic ESP32-S3 board using WiFi for networking.
+
+        config APC_NUT_BOARD_ESP32P4_ETH
+            bool "Waveshare ESP32-P4-ETH (wired Ethernet)"
+            help
+                Waveshare ESP32-P4-ETH board with IP101 GRI PHY via RMII.
+    endchoice
+
+    if APC_NUT_BOARD_ESP32S3
+        config APC_NUT_WIFI_SSID
+            string "WiFi SSID"
+            default "myssid"
+            help
+                SSID of the WiFi network to connect to.
+
+        config APC_NUT_WIFI_PASSWORD
+            string "WiFi Password"
+            default "mypassword"
+            help
+                WiFi password.
+    endif
+
+    config APC_NUT_PORT
+        int "NUT TCP port"
+        default 3493
+        range 1 65535
+        help
+            TCP port the NUT server listens on (standard NUT port is 3493).
+
+    config APC_NUT_USERNAME
+        string "NUT username"
+        default "upsmon"
+        help
+            Username accepted for NUT LOGIN command.
+
+    config APC_NUT_PASSWORD
+        string "NUT password"
+        default "secret"
+        help
+            Password accepted for NUT LOGIN command.
+
+    config APC_UPS_POLL_INTERVAL_MS
+        int "UPS poll interval (ms)"
+        default 2000
+        range 500 30000
+        help
+            How often to query the UPS via USB HID GET_REPORT.
+
+    config APC_HID_DEBUG
+        bool "Enable HID descriptor dump on connect"
+        default y
+        help
+            On first USB connect, dump the full parsed HID descriptor to the
+            serial console. Useful for verifying field mappings on a new device.
+            Disable in production to reduce log noise.
+
+endmenu

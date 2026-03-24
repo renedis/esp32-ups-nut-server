@@ -1,0 +1,11 @@
+# ESP-IDF build artifacts
+build/
+sdkconfig
+dependencies.lock
+
+# ESP-IDF managed components (auto-downloaded, like node_modules)
+managed_components/
+
+# Project-specific exclusions
+emulator/
+demo/

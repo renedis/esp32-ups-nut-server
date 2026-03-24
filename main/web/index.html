@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ESP32 UPS Monitor</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --base-100:#1e2130;
+  --base-200:#191b29;
+  --base-300:#141621;
+  --base-content:#e8edf8;
+  --base-content-muted:rgba(232,237,248,.6);
+  --primary:#6366f1;
+  --success:#4ade80;
+  --warning:#fbbf24;
+  --error:#f87171;
+  --info:#38bdf8;
+  --border-color:rgba(255,255,255,.08);
+  --radius-box:.5rem;
+  --radius-field:.25rem;
+  --font:ui-sans-serif,system-ui,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+html{font-size:16px;background:var(--base-300);color:var(--base-content);font-family:var(--font);min-height:100vh}
+a{color:inherit;text-decoration:none}
+.navbar{background:var(--base-200);border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;position:sticky;top:0;z-index:90;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.navbar-brand{display:flex;align-items:center;gap:.6rem;font-size:1.1rem;font-weight:700;letter-spacing:-.01em}
+.navbar-center{display:flex;gap:.25rem}
+.navbar-end{display:flex;align-items:center;gap:.75rem}
+.nav-link{display:flex;align-items:center;gap:.4rem;font-size:.875rem;font-weight:500;color:var(--base-content-muted);padding:.4rem .75rem;border-radius:var(--radius-field);transition:all .15s}
+.nav-link:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
+.nav-link.active{color:var(--base-content);background:rgba(255,255,255,.08)}
+.badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .7rem;border-radius:999px;border:1px solid}
+.badge-success{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.3);color:var(--success)}
+.badge-warning{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);color:var(--warning)}
+.badge-error{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:var(--error)}
+.badge-neutral{background:rgba(255,255,255,.06);border-color:var(--border-color);color:var(--base-content-muted)}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.badge-success .dot{box-shadow:0 0 5px var(--success)}
+.badge-warning .dot{box-shadow:0 0 5px var(--warning)}
+.badge-error .dot{box-shadow:0 0 5px var(--error)}
+.page{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+.section-label{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--base-content-muted);margin-bottom:1rem;opacity:.7}
+.card{background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:1.5rem}
+.card-title{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--base-content-muted);margin-bottom:1.25rem;opacity:.7}
+.donut-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.donut-card{display:flex;flex-direction:column;align-items:center;gap:.75rem}
+.donut-wrap{position:relative;width:150px;height:150px}
+.donut-wrap svg{transform:rotate(-90deg)}
+.donut-bg{fill:none;stroke:rgba(255,255,255,.07);stroke-width:10}
+.donut-fg{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.4,0,.2,1),stroke .4s}
+.donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.donut-pct{font-size:1.6rem;font-weight:700;letter-spacing:-.03em;font-family:var(--font-mono)}
+.donut-sublabel{font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--base-content-muted);margin-top:.1rem;opacity:.7}
+.stats-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:1rem}
+.stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:.55rem 0;border-bottom:1px solid var(--border-color)}
+.stat-row:last-child{border-bottom:none}
+.stat-key{font-size:.8rem;color:var(--base-content-muted)}
+.stat-val{font-size:.8rem;font-weight:600;font-family:var(--font-mono);color:var(--base-content)}
+.divider{height:1px;background:var(--border-color);margin:1.75rem 0}
+footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:flex;justify-content:space-between;align-items:center;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color)}
+.mono{font-family:var(--font-mono)}
+@media(max-width:640px){.page{padding:1.25rem 1rem}.navbar-center{display:none}.donut-grid{grid-template-columns:repeat(2,1fr)}}
+.info-badges{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem}
+.info-badge{flex:1;display:flex;align-items:center;justify-content:center;gap:.5rem;background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:.5rem 1rem;font-size:.85rem}
+.info-badge svg{opacity:.6;flex-shrink:0}
+.info-badge-label{color:var(--base-content-muted);font-size:.75rem}
+.info-badge-value{font-family:var(--font-mono);font-weight:600;color:var(--base-content);margin-left:.25rem}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+    <span>ESP32 UPS Monitor</span>
+  </div>
+  <div class="navbar-center">
+    <a href="/" class="nav-link active">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a href="/config" class="nav-link">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Configuration
+    </a>
+  </div>
+  <div class="navbar-end">
+    <span class="badge badge-neutral" id="status-badge"><span class="dot"></span><span id="status-text">Connecting</span></span>
+  </div>
+</nav>
+
+<main class="page">
+  <p class="section-label">Power Status</p>
+  <div class="donut-grid">
+    <div class="donut-card">
+      <div class="card-title">UPS Load</div>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 150 150" width="150" height="150">
+          <circle class="donut-bg" cx="75" cy="75" r="60"/>
+          <circle class="donut-fg" id="d-load" cx="75" cy="75" r="60" stroke="#4ade80" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="donut-center"><span class="donut-pct" id="v-load">--</span><span class="donut-sublabel">%</span></div>
+      </div>
+    </div>
+    <div class="donut-card">
+      <div class="card-title">Battery Charge</div>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 150 150" width="150" height="150">
+          <circle class="donut-bg" cx="75" cy="75" r="60"/>
+          <circle class="donut-fg" id="d-charge" cx="75" cy="75" r="60" stroke="#6366f1" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="donut-center"><span class="donut-pct" id="v-charge">--</span><span class="donut-sublabel">%</span></div>
+      </div>
+    </div>
+    <div class="donut-card">
+      <div class="card-title">Input Voltage</div>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 150 150" width="150" height="150">
+          <circle class="donut-bg" cx="75" cy="75" r="60"/>
+          <circle class="donut-fg" id="d-volt" cx="75" cy="75" r="60" stroke="#38bdf8" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="donut-center"><span class="donut-pct" id="v-volt" style="font-size:1.25rem">--</span><span class="donut-sublabel">VAC</span></div>
+      </div>
+    </div>
+    <div class="donut-card">
+      <div class="card-title">Battery Temp</div>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 150 150" width="150" height="150">
+          <circle class="donut-bg" cx="75" cy="75" r="60"/>
+          <circle class="donut-fg" id="d-temp" cx="75" cy="75" r="60" stroke="#fbbf24" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="donut-center"><span class="donut-pct" id="v-temp">--</span><span class="donut-sublabel">°C</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-badges">
+    <div class="info-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="info-badge-label">Battery Runtime</span>
+      <span class="info-badge-value" id="v-runtime">--</span>
+    </div>
+    <div class="info-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span class="info-badge-label">UPS Power</span>
+      <span class="info-badge-value" id="v-power-badge">--</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="stats-grid">
+    <div class="card">
+      <div class="card-title">Runtime Details</div>
+      <div class="stat-row"><span class="stat-key">Est. runtime remaining</span><span class="stat-val" id="v-runtime-detail">--</span></div>
+      <div class="stat-row"><span class="stat-key">Battery voltage</span><span class="stat-val" id="v-batvolt">--</span></div>
+      <div class="stat-row"><span class="stat-key">Charge low threshold</span><span class="stat-val" id="v-batlow">--</span></div>
+      <div class="stat-row"><span class="stat-key">Charge warning threshold</span><span class="stat-val" id="v-batwarn">--</span></div>
+      <div class="stat-row"><span class="stat-key">Last self-test result</span><span class="stat-val" id="v-test">--</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Device Info</div>
+      <div class="stat-row"><span class="stat-key">Manufacturer</span><span class="stat-val" id="v-mfr">--</span></div>
+      <div class="stat-row"><span class="stat-key">Model</span><span class="stat-val" id="v-model">--</span></div>
+      <div class="stat-row"><span class="stat-key">Firmware</span><span class="stat-val" id="v-fw">--</span></div>
+      <div class="stat-row"><span class="stat-key">Serial</span><span class="stat-val" id="v-serial">--</span></div>
+      <div class="stat-row"><span class="stat-key">Nominal power</span><span class="stat-val" id="v-power">--</span></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>ESP32-P4 NUT Server &mdash; <span id="ups-name">apc</span></span>
+  <span>Last update: <span class="mono" id="last-update">--</span></span>
+</footer>
+
+<script>
+const CIRC = 2 * Math.PI * 60;
+function setDonut(id, pct) {
+  const el = document.getElementById('d-' + id);
+  if (!el) return;
+  el.style.strokeDashoffset = CIRC * (1 - Math.min(100, Math.max(0, pct)) / 100);
+}
+function setText(id, val) {
+  const el = document.getElementById('v-' + id);
+  if (el) el.textContent = val;
+}
+function fmtRuntime(secs) {
+  if (!secs || isNaN(secs)) return '--';
+  const m = Math.floor(secs / 60), h = Math.floor(m / 60);
+  return h > 0 ? h + 'h ' + (m % 60) + 'm' : m + 'm ' + (secs % 60) + 's';
+}
+function applyStatus(s) {
+  const badge = document.getElementById('status-badge');
+  const txt = document.getElementById('status-text');
+  badge.className = 'badge';
+  if (!s) { badge.classList.add('badge-neutral'); txt.textContent = 'Unknown'; return; }
+  if (s.includes('LB')) { badge.classList.add('badge-error'); txt.textContent = 'Low Battery'; }
+  else if (s.includes('OB')) { badge.classList.add('badge-warning'); txt.textContent = 'On Battery'; }
+  else if (s.includes('OL')) { badge.classList.add('badge-success'); txt.textContent = 'On Line'; }
+  else { badge.classList.add('badge-neutral'); txt.textContent = s; }
+  if (s.includes('CHRG')) txt.textContent += ' \u00B7 Charging';
+}
+async function refresh() {
+  try {
+    const r = await fetch('/api/status');
+    if (!r.ok) return;
+    const d = await r.json();
+    const charge = parseFloat(d['battery.charge']) || 0;
+    const load   = parseFloat(d['ups.load']) || 0;
+    const volt   = parseFloat(d['input.voltage']) || 0;
+    const temp   = parseFloat(d['ups.temperature']) || 0;
+    setDonut('charge', charge); setText('charge', charge.toFixed(0));
+    setDonut('load', load);     setText('load', load.toFixed(0));
+    setDonut('volt', Math.min(100, (volt / 260) * 100)); setText('volt', volt.toFixed(0));
+    setDonut('temp', Math.min(100, (temp / 60) * 100));  setText('temp', temp.toFixed(1));
+    setText('runtime', fmtRuntime(parseInt(d['battery.runtime'])));
+    const rtDetail = document.getElementById('v-runtime-detail');
+    if (rtDetail) rtDetail.textContent = fmtRuntime(parseInt(d['battery.runtime']));
+    setText('batvolt', d['battery.voltage'] ? d['battery.voltage'] + ' V' : '--');
+    setText('batlow',  d['battery.charge.low'] ? d['battery.charge.low'] + ' %' : '--');
+    setText('batwarn', d['battery.charge.warning'] ? d['battery.charge.warning'] + ' %' : '--');
+    setText('test',    d['ups.test.result'] || '--');
+    setText('mfr',     d['device.mfr'] || d['ups.mfr'] || '--');
+    setText('model',   d['device.model'] || d['ups.model'] || '--');
+    setText('fw',      d['ups.firmware'] || '--');
+    setText('serial',  d['device.serial'] || '--');
+    setText('power',   d['ups.realpower.nominal'] ? d['ups.realpower.nominal'] + ' W' : '--');
+    const powerBadge = document.getElementById('v-power-badge');
+    if (powerBadge) powerBadge.textContent = d['ups.realpower.nominal'] ? d['ups.realpower.nominal'] + ' W' : '--';
+    applyStatus(d['ups.status']);
+    document.getElementById('ups-name').textContent = d['_ups_name'] || 'apc';
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+  } catch(e) { console.warn('fetch failed', e); }
+}
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

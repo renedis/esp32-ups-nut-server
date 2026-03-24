@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ESP32 UPS — Configuration</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --base-100:#1e2130;
+  --base-200:#191b29;
+  --base-300:#141621;
+  --base-content:#e8edf8;
+  --base-content-muted:rgba(232,237,248,.6);
+  --primary:#6366f1;
+  --primary-hover:#4f46e5;
+  --success:#4ade80;
+  --error:#f87171;
+  --border-color:rgba(255,255,255,.08);
+  --border-focus:#6366f1;
+  --radius-box:.5rem;
+  --radius-field:.25rem;
+  --font:ui-sans-serif,system-ui,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+html{font-size:16px;background:var(--base-300);color:var(--base-content);font-family:var(--font);min-height:100vh}
+a{color:inherit;text-decoration:none}
+.navbar{background:var(--base-200);border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;position:sticky;top:0;z-index:90;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.navbar-brand{display:flex;align-items:center;gap:.6rem;font-size:1.1rem;font-weight:700;letter-spacing:-.01em}
+.navbar-center{display:flex;gap:.25rem}
+.nav-link{display:flex;align-items:center;gap:.4rem;font-size:.875rem;font-weight:500;color:var(--base-content-muted);padding:.4rem .75rem;border-radius:var(--radius-field);transition:all .15s}
+.nav-link:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
+.nav-link.active{color:var(--base-content);background:rgba(255,255,255,.08)}
+.page{max-width:860px;margin:0 auto;padding:2rem 1.5rem}
+.page-header{margin-bottom:1.75rem}
+.page-title{font-size:1.25rem;font-weight:700;letter-spacing:-.01em;opacity:.85}
+.page-subtitle{font-size:.8rem;color:var(--base-content-muted);margin-top:.25rem}
+.card{background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:1.5rem;margin-bottom:1rem}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border-color)}
+.card-title{font-size:.9rem;font-weight:600;color:var(--base-content)}
+.card-subtitle{font-size:.75rem;color:var(--base-content-muted);margin-top:.2rem}
+.field{margin-bottom:1.1rem}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--base-content-muted);margin-bottom:.4rem}
+.field input,.field select{width:100%;background:var(--base-200);border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.55rem .8rem;font-size:.875rem;color:var(--base-content);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.field input[type="number"]{font-family:var(--font-mono)}
+.field input::placeholder{color:rgba(232,237,248,.25)}
+.field-row{display:grid;gap:.9rem;grid-template-columns:1fr 1fr}
+.field-hint{font-size:.7rem;color:var(--base-content-muted);margin-top:.3rem;opacity:.7}
+.field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%23888daa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .8rem center}
+.topic-preview{font-size:.7rem;font-family:var(--font-mono);color:var(--primary);background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:var(--radius-field);padding:.35rem .65rem;margin-top:.4rem;word-break:break-all}
+.toggle-wrap{display:flex;align-items:center;gap:.65rem;flex-shrink:0}
+.toggle{position:relative;width:38px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{position:absolute;inset:0;background:var(--base-200);border:1px solid var(--border-color);border-radius:999px;cursor:pointer;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;height:13px;width:13px;left:3px;top:3px;background:rgba(232,237,248,.4);border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:var(--primary);border-color:var(--primary)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(17px);background:#fff}
+.toggle-label{font-size:.78rem;font-weight:500;color:var(--base-content-muted);min-width:3.5rem}
+.actions{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.5rem}
+.btn{font-size:.875rem;font-weight:600;padding:.55rem 1.25rem;border-radius:var(--radius-field);border:none;cursor:pointer;transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;gap:.4rem}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-primary:active{transform:scale(.98)}
+.btn-ghost{background:transparent;color:var(--base-content-muted);border:1px solid var(--border-color)}
+.btn-ghost:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
+.disabled-overlay{opacity:.35;pointer-events:none}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(1.5rem);opacity:0;background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:.65rem 1.1rem;font-size:.85rem;font-weight:500;transition:all .25s;pointer-events:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:rgba(74,222,128,.4);color:var(--success)}
+.toast.err{border-color:rgba(248,113,113,.4);color:var(--error)}
+footer{max-width:860px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color);margin-top:.5rem}
+@media(max-width:640px){.page{padding:1.25rem 1rem}.navbar-center{display:none}.field-row{grid-template-columns:1fr}.actions{flex-direction:column}.btn{justify-content:center}}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+    <span>ESP32 UPS Monitor</span>
+  </div>
+  <div class="navbar-center">
+    <a href="/" class="nav-link">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a href="/config" class="nav-link active">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Configuration
+    </a>
+  </div>
+  <div></div>
+</nav>
+
+<main class="page">
+  <div class="page-header">
+    <div class="page-title">Configuration</div>
+    <div class="page-subtitle">Manage NUT server and MQTT settings</div>
+  </div>
+
+  <form id="cfg-form">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">NUT Server</div>
+          <div class="card-subtitle">Network UPS Tools protocol settings</div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ups_name">UPS Name</label>
+          <input id="ups_name" name="ups_name" type="text" maxlength="31" placeholder="apc">
+          <div class="field-hint">Identifier used in NUT protocol commands (e.g. LIST UPS)</div>
+        </div>
+        <div class="field">
+          <label for="ups_desc">UPS Description</label>
+          <input id="ups_desc" name="ups_desc" type="text" maxlength="63" placeholder="APC Back-UPS BE850G2">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="nut_user">NUT Username</label>
+          <input id="nut_user" name="nut_user" type="text" maxlength="31" placeholder="upsmon">
+        </div>
+        <div class="field">
+          <label for="nut_pass">NUT Password</label>
+          <input id="nut_pass" name="nut_pass" type="password" maxlength="63" placeholder="••••••••">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="nut_port">TCP Port</label>
+          <input id="nut_port" name="nut_port" type="number" min="1" max="65535" placeholder="3493">
+        </div>
+        <div class="field">
+          <label for="poll_ms">Poll Interval (ms)</label>
+          <input id="poll_ms" name="poll_ms" type="number" min="500" max="30000" step="500" placeholder="2000">
+          <div class="field-hint">How often USB HID GET_REPORT is sent to the UPS</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">MQTT</div>
+          <div class="card-subtitle">Publish UPS telemetry to a broker</div>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle">
+            <input type="checkbox" id="mqtt_en" name="mqtt_en">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label" id="mqtt-toggle-label">Disabled</span>
+        </div>
+      </div>
+      <div id="mqtt-fields">
+        <div class="field">
+          <label for="mqtt_uri">Broker URI</label>
+          <input id="mqtt_uri" name="mqtt_uri" type="text" maxlength="127" placeholder="mqtt://192.168.1.10:1883">
+          <div class="field-hint">Supports mqtt://, mqtts://, ws://, wss://</div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="mqtt_user">Username</label>
+            <input id="mqtt_user" name="mqtt_user" type="text" maxlength="63" placeholder="(optional)">
+          </div>
+          <div class="field">
+            <label for="mqtt_pass">Password</label>
+            <input id="mqtt_pass" name="mqtt_pass" type="password" maxlength="63" placeholder="(optional)">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="mqtt_prefix">Topic Prefix</label>
+            <input id="mqtt_prefix" name="mqtt_prefix" type="text" maxlength="63" placeholder="homeassistant/sensor/ups" oninput="updatePreview()">
+            <div class="topic-preview" id="topic-preview">homeassistant/sensor/ups/battery/charge</div>
+          </div>
+          <div class="field">
+            <label for="mqtt_interval">Publish Interval (s)</label>
+            <input id="mqtt_interval" name="mqtt_interval" type="number" min="5" max="3600" placeholder="30">
+          </div>
+        </div>
+        <div class="field">
+          <label for="mqtt_qos">QoS Level</label>
+          <select id="mqtt_qos" name="mqtt_qos">
+            <option value="0">0 — At most once (fire and forget)</option>
+            <option value="1" selected>1 — At least once</option>
+            <option value="2">2 — Exactly once</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="mqtt_ha">Home Assistant Discovery</label>
+          <select id="mqtt_ha" name="mqtt_ha">
+            <option value="1" selected>Enabled — publish discovery messages</option>
+            <option value="0">Disabled</option>
+          </select>
+          <div class="field-hint">Publishes MQTT discovery config so HA auto-creates entities</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn btn-ghost" onclick="loadConfig()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Discard
+      </button>
+      <button type="submit" class="btn btn-primary">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save &amp; Apply
+      </button>
+    </div>
+  </form>
+</main>
+
+<footer>ESP32-P4 NUT Server</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+function updatePreview() {
+  const prefix = document.getElementById('mqtt_prefix').value || 'homeassistant/sensor/ups';
+  document.getElementById('topic-preview').textContent = prefix + '/battery/charge';
+}
+const mqttEn = document.getElementById('mqtt_en');
+const mqttFields = document.getElementById('mqtt-fields');
+const mqttLabel = document.getElementById('mqtt-toggle-label');
+mqttEn.addEventListener('change', () => {
+  const on = mqttEn.checked;
+  mqttLabel.textContent = on ? 'Enabled' : 'Disabled';
+  mqttFields.classList.toggle('disabled-overlay', !on);
+});
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function setField(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.type === 'checkbox') el.checked = !!val;
+  else if (el.type === 'select-one') el.value = String(val);
+  else el.value = val !== undefined && val !== null ? val : '';
+}
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    setField('ups_name',      d.ups_name);
+    setField('ups_desc',      d.ups_desc);
+    setField('nut_user',      d.nut_user);
+    setField('nut_pass',      d.nut_pass);
+    setField('nut_port',      d.nut_port);
+    setField('poll_ms',       d.poll_ms);
+    setField('mqtt_en',       d.mqtt_en);
+    setField('mqtt_uri',      d.mqtt_uri);
+    setField('mqtt_user',     d.mqtt_user);
+    setField('mqtt_pass',     d.mqtt_pass);
+    setField('mqtt_prefix',   d.mqtt_prefix);
+    setField('mqtt_interval', d.mqtt_interval);
+    setField('mqtt_qos',      d.mqtt_qos);
+    setField('mqtt_ha',       d.mqtt_ha);
+    mqttLabel.textContent = d.mqtt_en ? 'Enabled' : 'Disabled';
+    mqttFields.classList.toggle('disabled-overlay', !d.mqtt_en);
+    updatePreview();
+  } catch(e) {
+    showToast('Failed to load config', 'err');
+  }
+}
+document.getElementById('cfg-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    ups_name:      document.getElementById('ups_name').value.trim(),
+    ups_desc:      document.getElementById('ups_desc').value.trim(),
+    nut_user:      document.getElementById('nut_user').value.trim(),
+    nut_pass:      document.getElementById('nut_pass').value,
+    nut_port:      parseInt(document.getElementById('nut_port').value) || 3493,
+    poll_ms:       parseInt(document.getElementById('poll_ms').value) || 2000,
+    mqtt_en:       document.getElementById('mqtt_en').checked,
+    mqtt_uri:      document.getElementById('mqtt_uri').value.trim(),
+    mqtt_user:     document.getElementById('mqtt_user').value.trim(),
+    mqtt_pass:     document.getElementById('mqtt_pass').value,
+    mqtt_prefix:   document.getElementById('mqtt_prefix').value.trim(),
+    mqtt_interval: parseInt(document.getElementById('mqtt_interval').value) || 30,
+    mqtt_qos:      parseInt(document.getElementById('mqtt_qos').value),
+    mqtt_ha:       parseInt(document.getElementById('mqtt_ha').value),
+  };
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(r.status);
+    showToast('Saved — settings applied', 'ok');
+  } catch(e) {
+    showToast('Save failed', 'err');
+  }
+});
+loadConfig();
+updatePreview();
+</script>
+</body>
+</html>

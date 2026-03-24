@@ -85,21 +85,84 @@ static esp_err_t get_feature_report(uint8_t report_id,
     return ret;
 }
 
-static bool read_field(uint32_t usage, int32_t *out)
+/* Read a feature report field; returns the field on success, NULL on failure. */
+static const hid_field_t *read_field_val(uint32_t usage, int32_t *out)
 {
     const hid_field_t *f = hid_find_field(&g_ups.report_map, usage,
                                            HID_ITEM_TYPE_FEATURE);
-    if (!f) return false;
+    if (!f) return NULL;
 
     uint8_t buf[65];
     size_t  report_bytes = (f->bit_offset + f->bit_size + 7) / 8 + 1;
     if (report_bytes > sizeof(buf)) report_bytes = sizeof(buf);
 
     if (get_feature_report(f->report_id, buf, report_bytes) != ESP_OK)
-        return false;
+        return NULL;
 
     *out = hid_extract_field_value(buf + 1, report_bytes - 1, f);
-    return true;
+    return f;
+}
+
+/* Convenience wrapper for callers that don't need the field pointer. */
+static bool read_field(uint32_t usage, int32_t *out)
+{
+    return read_field_val(usage, out) != NULL;
+}
+
+/* Collection-aware variant: only matches fields whose collection path contains
+ * parent_coll.  Returns the field on success, NULL on failure. */
+static const hid_field_t *read_field_coll_val(uint32_t usage,
+                                               uint32_t parent_coll,
+                                               int32_t *out)
+{
+    const hid_field_t *f = hid_find_field_in_collection(&g_ups.report_map, usage,
+                                                         HID_ITEM_TYPE_FEATURE,
+                                                         parent_coll);
+    if (!f) return NULL;
+
+    uint8_t buf[65];
+    size_t  report_bytes = (f->bit_offset + f->bit_size + 7) / 8 + 1;
+    if (report_bytes > sizeof(buf)) report_bytes = sizeof(buf);
+
+    if (get_feature_report(f->report_id, buf, report_bytes) != ESP_OK)
+        return NULL;
+
+    *out = hid_extract_field_value(buf + 1, report_bytes - 1, f);
+    return f;
+}
+
+/* Decode HID battery ManufacturerDate (DOS/FAT packed format) → "YYYY/MM/DD". */
+static void decode_mfr_date(int32_t raw, char *buf, size_t len)
+{
+    int day   =  raw        & 0x1F;
+    int month = (raw >>  5) & 0x0F;
+    int year  = ((raw >> 9) & 0x7F) + 1980;
+    snprintf(buf, len, "%04d/%02d/%02d", year, month, day);
+}
+
+/* Decode AudibleAlarmControl value → NUT string. */
+static const char *decode_beeper(int32_t val)
+{
+    switch (val) {
+    case 1:  return "enabled";
+    case 2:  return "muted";
+    case 3:  return "disabled";
+    default: return "unknown";
+    }
+}
+
+/* Decode HID Test value → NUT string. */
+static const char *decode_test_result(int32_t val)
+{
+    switch (val) {
+    case 1:  return "Done and passed";
+    case 2:  return "Done and warning";
+    case 3:  return "Done and error";
+    case 4:  return "Aborted";
+    case 5:  return "In progress";
+    case 6:  return "No test initiated";
+    default: return "Unknown";
+    }
 }
 
 static void update_ups_status(void)
@@ -134,10 +197,23 @@ static void poll_all_vars(void)
 {
     char buf[32];
     int32_t val;
+    const hid_field_t *f;
+
+    /* ---- Battery ---- */
 
     if (read_field(HID_USAGE_BS_REMAINING_CAPACITY, &val)) {
         snprintf(buf, sizeof(buf), "%"PRId32, val);
         set_var("battery.charge", buf);
+    }
+
+    if (read_field(HID_USAGE_BS_REMAINING_CAP_LIMIT, &val)) {
+        snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("battery.charge.low", buf);
+    }
+
+    if (read_field(HID_USAGE_BS_WARNING_CAP_LIMIT, &val)) {
+        snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("battery.charge.warning", buf);
     }
 
     if (read_field(HID_USAGE_BS_RUNTIME_TO_EMPTY, &val)) {
@@ -145,37 +221,142 @@ static void poll_all_vars(void)
         set_var("battery.runtime", buf);
     }
 
-    if (read_field(HID_USAGE_BS_VOLTAGE, &val)) {
-        const hid_field_t *f = hid_find_field(&g_ups.report_map,
-                                               HID_USAGE_BS_VOLTAGE,
-                                               HID_ITEM_TYPE_FEATURE);
-        if (f && f->logical_max > 100)
+    if ((f = read_field_val(HID_USAGE_BS_VOLTAGE, &val)) != NULL) {
+        /* APC reports battery voltage in mV (logical_max > 100) */
+        if (f->logical_max > 100)
             snprintf(buf, sizeof(buf), "%.1f", val / 1000.0f);
         else
             snprintf(buf, sizeof(buf), "%"PRId32, val);
         set_var("battery.voltage", buf);
     }
 
-    if (read_field(HID_USAGE_PD_VOLTAGE, &val)) {
-        const hid_field_t *f = hid_find_field(&g_ups.report_map,
-                                               HID_USAGE_PD_VOLTAGE,
-                                               HID_ITEM_TYPE_FEATURE);
-        if (f && f->logical_max > 300)
+    if ((f = read_field_val(HID_USAGE_BS_TEMPERATURE, &val)) != NULL) {
+        /* HID temp in 0.1 K when logical_max > 1000, else direct Celsius */
+        if (f->logical_max > 1000)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f - 273.15f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("battery.temperature", buf);
+    }
+
+    if (read_field(HID_USAGE_BS_CYCLE_COUNT, &val)) {
+        snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("battery.cycle.count", buf);
+    }
+
+    if (read_field(HID_USAGE_BS_MANUFACTURER_DATE, &val)) {
+        decode_mfr_date(val, buf, sizeof(buf));
+        set_var("battery.mfr.date", buf);
+    }
+
+    /* ---- Input ---- */
+
+    /* input.voltage: prefer collection-aware lookup (Input collection),
+     * fall back to first occurrence for devices without explicit Input collection. */
+    f = read_field_coll_val(HID_USAGE_PD_VOLTAGE, HID_USAGE_PD_INPUT, &val);
+    if (!f) f = read_field_val(HID_USAGE_PD_VOLTAGE, &val);
+    if (f) {
+        if (f->logical_max > 300)
             snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
         else
             snprintf(buf, sizeof(buf), "%"PRId32, val);
         set_var("input.voltage", buf);
     }
 
+    f = read_field_coll_val(HID_USAGE_PD_CONFIG_VOLTAGE, HID_USAGE_PD_INPUT, &val);
+    if (!f) f = read_field_val(HID_USAGE_PD_CONFIG_VOLTAGE, &val);
+    if (f) {
+        if (f->logical_max > 300)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("input.voltage.nominal", buf);
+    }
+
+    if ((f = read_field_coll_val(HID_USAGE_PD_FREQUENCY, HID_USAGE_PD_INPUT, &val)) != NULL
+     || (f = read_field_val(HID_USAGE_PD_FREQUENCY, &val)) != NULL) {
+        if (f->logical_max > 100)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("input.frequency", buf);
+    }
+
+    if ((f = read_field_val(HID_USAGE_PD_LOW_VOLTAGE_TRANSFER, &val)) != NULL) {
+        if (f->logical_max > 300)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("input.transfer.low", buf);
+    }
+
+    if ((f = read_field_val(HID_USAGE_PD_HIGH_VOLTAGE_TRANSFER, &val)) != NULL) {
+        if (f->logical_max > 300)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("input.transfer.high", buf);
+    }
+
+    /* ---- Output ---- */
+
+    if ((f = read_field_coll_val(HID_USAGE_PD_VOLTAGE, HID_USAGE_PD_OUTPUT, &val)) != NULL) {
+        if (f->logical_max > 300)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("output.voltage", buf);
+    }
+
+    if ((f = read_field_coll_val(HID_USAGE_PD_CURRENT, HID_USAGE_PD_OUTPUT, &val)) != NULL) {
+        /* current typically in 10 mA units → A */
+        snprintf(buf, sizeof(buf), "%.2f", val / 100.0f);
+        set_var("output.current", buf);
+    }
+
+    if ((f = read_field_coll_val(HID_USAGE_PD_FREQUENCY, HID_USAGE_PD_OUTPUT, &val)) != NULL) {
+        if (f->logical_max > 100)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("output.frequency", buf);
+    }
+
+    /* ---- UPS ---- */
+
     if (read_field(HID_USAGE_PD_PERCENT_LOAD, &val)) {
         snprintf(buf, sizeof(buf), "%"PRId32, val);
         set_var("ups.load", buf);
     }
 
-    if (read_field(HID_USAGE_BS_WARNING_CAP_LIMIT, &val)) {
-        snprintf(buf, sizeof(buf), "%"PRId32, val);
-        set_var("battery.charge.warning", buf);
+    if ((f = read_field_val(HID_USAGE_PD_TEMPERATURE, &val)) != NULL) {
+        if (f->logical_max > 1000)
+            snprintf(buf, sizeof(buf), "%.1f", val / 10.0f - 273.15f);
+        else
+            snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("ups.temperature", buf);
     }
+
+    if (read_field(HID_USAGE_PD_CONFIG_ACTIVE_POWER, &val)) {
+        snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("ups.realpower.nominal", buf);
+    }
+
+    if (read_field(HID_USAGE_PD_DELAY_BEFORE_STARTUP, &val)) {
+        snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("ups.delay.start", buf);
+    }
+
+    if (read_field(HID_USAGE_PD_DELAY_BEFORE_SHUTDOWN, &val)) {
+        snprintf(buf, sizeof(buf), "%"PRId32, val);
+        set_var("ups.delay.shutdown", buf);
+    }
+
+    if (read_field(HID_USAGE_PD_AUDIBLE_ALARM, &val))
+        set_var("ups.beeper.status", decode_beeper(val));
+
+    if (read_field(HID_USAGE_PD_TEST, &val))
+        set_var("ups.test.result", decode_test_result(val));
 
     update_ups_status();
 }
@@ -310,21 +491,39 @@ void apc_ups_get_data(ups_data_t *out)
 #define GETS(field, key) do { v = apc_ups_get_var(key); \
     if (v) strlcpy(out->field, v, sizeof(out->field)); } while(0)
 
-    GETS(status,                "ups.status");
-    GETS(mfr,                   "device.mfr");
-    GETS(model,                 "device.model");
-    GETS(firmware,              "ups.firmware");
-    GETS(serial,                "device.serial");
-    GETS(test_result,           "ups.test.result");
-    GETF(battery_charge,        "battery.charge");
-    GETF(battery_runtime,       "battery.runtime");
-    GETF(battery_voltage,       "battery.voltage");
-    GETF(battery_charge_low,    "battery.charge.low");
-    GETF(battery_charge_warning,"battery.charge.warning");
-    GETF(input_voltage,         "input.voltage");
-    GETF(ups_load,              "ups.load");
-    GETF(ups_temperature,       "ups.temperature");
-    GETF(ups_realpower_nominal, "ups.realpower.nominal");
+    GETS(status,                 "ups.status");
+    GETS(mfr,                    "device.mfr");
+    GETS(model,                  "device.model");
+    GETS(firmware,               "ups.firmware");
+    GETS(serial,                 "device.serial");
+    GETS(battery_type,           "battery.type");
+    GETS(battery_mfr_date,       "battery.mfr.date");
+    GETS(ups_beeper_status,      "ups.beeper.status");
+    GETS(ups_test_result,        "ups.test.result");
+    GETF(battery_charge,         "battery.charge");
+    GETF(battery_charge_low,     "battery.charge.low");
+    GETF(battery_charge_warning, "battery.charge.warning");
+    GETF(battery_runtime,        "battery.runtime");
+    GETF(battery_voltage,        "battery.voltage");
+    GETF(battery_voltage_nominal,"battery.voltage.nominal");
+    GETF(battery_temperature,    "battery.temperature");
+    { v = apc_ups_get_var("battery.cycle.count");
+      if (v) out->battery_cycle_count = (int32_t)strtol(v, NULL, 10); }
+    GETF(input_voltage,          "input.voltage");
+    GETF(input_voltage_nominal,  "input.voltage.nominal");
+    GETF(input_frequency,        "input.frequency");
+    GETF(input_transfer_low,     "input.transfer.low");
+    GETF(input_transfer_high,    "input.transfer.high");
+    GETF(output_voltage,         "output.voltage");
+    GETF(output_current,         "output.current");
+    GETF(output_frequency,       "output.frequency");
+    GETF(ups_load,               "ups.load");
+    GETF(ups_temperature,        "ups.temperature");
+    GETF(ups_realpower_nominal,  "ups.realpower.nominal");
+    { v = apc_ups_get_var("ups.delay.start");
+      if (v) out->ups_delay_start = (int32_t)strtol(v, NULL, 10); }
+    { v = apc_ups_get_var("ups.delay.shutdown");
+      if (v) out->ups_delay_shutdown = (int32_t)strtol(v, NULL, 10); }
 #undef GETF
 #undef GETS
 }

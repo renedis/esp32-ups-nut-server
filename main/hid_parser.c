@@ -217,6 +217,22 @@ const hid_field_t *hid_find_field(const hid_report_map_t *map,
     return NULL;
 }
 
+const hid_field_t *hid_find_field_in_collection(const hid_report_map_t *map,
+                                                 uint32_t usage,
+                                                 hid_item_type_t type,
+                                                 uint32_t parent_collection)
+{
+    for (uint8_t i = 0; i < map->count; i++) {
+        const hid_field_t *f = &map->fields[i];
+        if (f->usage != usage || f->item_type != type) continue;
+        for (uint8_t d = 0; d < f->collection_depth; d++) {
+            if (f->collection_path[d] == parent_collection)
+                return f;
+        }
+    }
+    return NULL;
+}
+
 int32_t hid_extract_field_value(const uint8_t *report, size_t report_len,
                                 const hid_field_t *field)
 {

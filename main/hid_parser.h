@@ -9,10 +9,14 @@
 
 #define USAGE(page, id)    (((uint32_t)(page) << 16) | ((uint32_t)(id)))
 
-/* USB HID Power Device page (0x84) */
+/* USB HID Power Device page (0x84) — collections */
 #define HID_USAGE_UPS                   USAGE(0x84, 0x04)
 #define HID_USAGE_POWER_SUMMARY         USAGE(0x84, 0x05)
 #define HID_USAGE_PRESENT_STATUS        USAGE(0x84, 0x02)
+#define HID_USAGE_PD_INPUT              USAGE(0x84, 0x1C)
+#define HID_USAGE_PD_OUTPUT             USAGE(0x84, 0x1D)
+#define HID_USAGE_PD_FLOW               USAGE(0x84, 0x1E)
+/* USB HID Power Device page (0x84) — measurements */
 #define HID_USAGE_PD_VOLTAGE            USAGE(0x84, 0x30)
 #define HID_USAGE_PD_CURRENT            USAGE(0x84, 0x31)
 #define HID_USAGE_PD_FREQUENCY          USAGE(0x84, 0x32)
@@ -20,12 +24,20 @@
 #define HID_USAGE_PD_ACTIVE_POWER       USAGE(0x84, 0x34)
 #define HID_USAGE_PD_PERCENT_LOAD       USAGE(0x84, 0x35)
 #define HID_USAGE_PD_TEMPERATURE        USAGE(0x84, 0x36)
-#define HID_USAGE_PD_SHUTDOWN_IMMINENT  USAGE(0x84, 0x69)
-#define HID_USAGE_PD_DELAY_BEFORE_SHUTDOWN USAGE(0x84, 0x57)
-#define HID_USAGE_PD_DELAY_BEFORE_STARTUP  USAGE(0x84, 0x56)
+/* USB HID Power Device page (0x84) — config */
+#define HID_USAGE_PD_CONFIG_VOLTAGE         USAGE(0x84, 0x40)
+#define HID_USAGE_PD_CONFIG_ACTIVE_POWER    USAGE(0x84, 0x44)
+/* USB HID Power Device page (0x84) — controls */
+#define HID_USAGE_PD_LOW_VOLTAGE_TRANSFER   USAGE(0x84, 0x53)
+#define HID_USAGE_PD_HIGH_VOLTAGE_TRANSFER  USAGE(0x84, 0x54)
+#define HID_USAGE_PD_DELAY_BEFORE_STARTUP   USAGE(0x84, 0x56)
+#define HID_USAGE_PD_DELAY_BEFORE_SHUTDOWN  USAGE(0x84, 0x57)
+#define HID_USAGE_PD_TEST               USAGE(0x84, 0x58)
 #define HID_USAGE_PD_AUDIBLE_ALARM      USAGE(0x84, 0x5A)
-#define HID_USAGE_PD_IPRODUCT           USAGE(0x84, 0x61)
+#define HID_USAGE_PD_SHUTDOWN_IMMINENT  USAGE(0x84, 0x69)
+/* USB HID Power Device page (0x84) — string indices */
 #define HID_USAGE_PD_IMANUFACTURER      USAGE(0x84, 0x60)
+#define HID_USAGE_PD_IPRODUCT           USAGE(0x84, 0x61)
 #define HID_USAGE_PD_ISERIAL            USAGE(0x84, 0x62)
 
 /* USB HID Battery System page (0x85) */
@@ -74,9 +86,18 @@ typedef struct {
 esp_err_t hid_parse_report_descriptor(const uint8_t *desc, size_t len,
                                       hid_report_map_t *map);
 
+/* Find first field matching usage + item type */
 const hid_field_t *hid_find_field(const hid_report_map_t *map,
                                   uint32_t usage,
                                   hid_item_type_t type);
+
+/* Find first field matching usage + item type whose collection path contains
+ * parent_collection.  Use this to distinguish e.g. Input.Voltage from
+ * Output.Voltage (same usage 0x84/0x30, different parent collection). */
+const hid_field_t *hid_find_field_in_collection(const hid_report_map_t *map,
+                                                 uint32_t usage,
+                                                 hid_item_type_t type,
+                                                 uint32_t parent_collection);
 
 int32_t hid_extract_field_value(const uint8_t *report, size_t report_len,
                                 const hid_field_t *field);

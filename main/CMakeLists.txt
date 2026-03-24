@@ -19,6 +19,7 @@ idf_component_register(
         "legrand_subdriver.c"
         "openups_subdriver.c"
         "ecoflow_subdriver.c"
+        "riello_usb.c"
         "nut_server.c"
         "nvs_config.c"
         "web_server.c"

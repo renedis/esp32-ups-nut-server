@@ -117,6 +117,11 @@ static void clear_vars(void)
 /* -----------------------------------------------------------------------
  * Variable store (public API)
  * ----------------------------------------------------------------------- */
+void ups_driver_set_var(const char *name, const char *value)
+{
+    set_var(name, value);
+}
+
 const char *ups_driver_get_var(const char *name)
 {
     xSemaphoreTake(s_vars_mutex, portMAX_DELAY);

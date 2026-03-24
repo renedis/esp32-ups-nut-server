@@ -9,6 +9,7 @@
 #include "esp_task_wdt.h"
 #include "nvs_flash.h"
 #include "usb/usb_host.h"
+#include "riello_usb.h"
 #include "ups_driver.h"
 #include "nut_server.h"
 #include "nvs_config.h"
@@ -223,6 +224,9 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(usb_host_install(&host_cfg));
     xTaskCreatePinnedToCore(usb_host_task, "usb_host", 4096, NULL, 5, NULL, 0);
+
+    ESP_ERROR_CHECK(riello_usb_init());
+    xTaskCreate(riello_usb_task, "riello_usb", 4096, NULL, 4, NULL);
 
     ESP_ERROR_CHECK(ups_driver_init());
     xTaskCreate(ups_driver_poll_task, "ups_poll", 4096, NULL, 4, NULL);

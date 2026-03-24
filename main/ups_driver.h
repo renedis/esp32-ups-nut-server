@@ -73,6 +73,7 @@ void        ups_driver_poll_task(void *arg);
 
 /* Thread-safe variable store accessors. */
 const char *ups_driver_get_var(const char *name);
+void        ups_driver_set_var(const char *name, const char *value);
 void        ups_driver_list_vars(char *buf, size_t buf_len);
 
 /* Populate a ups_data_t snapshot (used by web/MQTT). */

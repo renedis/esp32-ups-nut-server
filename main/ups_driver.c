@@ -1,6 +1,17 @@
 #include "ups_driver.h"
-#include "apc_subdriver.h"
 #include "hid_parser.h"
+
+/* Vendor subdrivers */
+#include "apc_subdriver.h"
+extern const ups_subdriver_t mge_subdriver;
+extern const ups_subdriver_t belkin_subdriver;
+extern const ups_subdriver_t cps_subdriver;
+extern const ups_subdriver_t tripplite_subdriver;
+extern const ups_subdriver_t powercom_subdriver;
+extern const ups_subdriver_t powervar_subdriver;
+extern const ups_subdriver_t salicru_subdriver;
+extern const ups_subdriver_t delta_subdriver;
+extern const ups_subdriver_t ever_subdriver;
 #include <string.h>
 #include <stdio.h>
 #include "esp_log.h"
@@ -19,10 +30,22 @@ static const char *TAG = "ups_driver";
  * The first subdriver whose VID:PID table matches the connected device
  * is selected; order matters only when two subdrivers claim the same ID.
  * ----------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------
+ * Registered subdrivers — first match wins.
+ * Order matters only when two subdrivers claim the same VID:PID.
+ * PIDs of 0xffff in a device table entry match any PID from that vendor.
+ * ----------------------------------------------------------------------- */
 static const ups_subdriver_t *s_subdriver_list[] = {
     &apc_subdriver,
-    /* &mge_subdriver, */
-    /* &tripplite_subdriver, */
+    &mge_subdriver,
+    &belkin_subdriver,
+    &cps_subdriver,
+    &tripplite_subdriver,
+    &powercom_subdriver,
+    &powervar_subdriver,
+    &salicru_subdriver,
+    &delta_subdriver,
+    &ever_subdriver,
     NULL   /* sentinel */
 };
 
@@ -210,12 +233,17 @@ static const char *lkp_lookup(const ups_lkp_t *lkp, int32_t val)
 /* -----------------------------------------------------------------------
  * Subdriver / device detection
  * ----------------------------------------------------------------------- */
+/* pid==0xffff in a device table entry is a vendor wildcard (any PID). */
+static bool device_matches(const ups_vid_pid_t *d, uint16_t vid, uint16_t pid)
+{
+    return d->vid == vid && (d->pid == pid || d->pid == 0xffff);
+}
+
 static const ups_subdriver_t *find_subdriver(uint16_t vid, uint16_t pid)
 {
-    for (int i = 0; s_subdriver_list[i]; i++) {
+    for (int i = 0; s_subdriver_list[i]; i++)
         for (const ups_vid_pid_t *d = s_subdriver_list[i]->devices; d->vid; d++)
-            if (d->vid == vid && d->pid == pid) return s_subdriver_list[i];
-    }
+            if (device_matches(d, vid, pid)) return s_subdriver_list[i];
     return NULL;
 }
 
@@ -223,7 +251,7 @@ static const ups_vid_pid_t *find_device_entry(uint16_t vid, uint16_t pid)
 {
     for (int i = 0; s_subdriver_list[i]; i++)
         for (const ups_vid_pid_t *d = s_subdriver_list[i]->devices; d->vid; d++)
-            if (d->vid == vid && d->pid == pid) return d;
+            if (device_matches(d, vid, pid)) return d;
     return NULL;
 }
 

@@ -25,6 +25,18 @@ static const ups_lkp_t lkp_replace_battery[] = {
 static const ups_lkp_t lkp_shutdown_imminent[] = {
     { 1, "FSD" }, { 0, "" }, { 0, NULL }
 };
+static const ups_lkp_t lkp_overload[] = {
+    { 1, "OVER" }, { 0, "" }, { 0, NULL }
+};
+static const ups_lkp_t lkp_fully_charged[] = {
+    { 1, "" }, { 0, "" }, { 0, NULL }  /* no status token for fully charged */
+};
+static const ups_lkp_t lkp_boost[] = {
+    { 1, "BOOST" }, { 0, "" }, { 0, NULL }
+};
+static const ups_lkp_t lkp_buck[] = {
+    { 1, "TRIM" }, { 0, "" }, { 0, NULL }
+};
 
 /* -----------------------------------------------------------------------
  * Enum lookup tables
@@ -144,6 +156,37 @@ const ups_var_map_t hid_var_map_standard[] = {
     { "ups.test.result",
       HID_USAGE_PD_TEST,                  0, HID_ITEM_TYPE_FEATURE,
       0, lkp_test_result, NULL },
+
+    /* --- additional status bits ---------------------------------- */
+    { "ups.status", HID_USAGE_BS_OVERLOAD,             0,
+      HID_ITEM_TYPE_FEATURE, UPS_MAP_STATUS_BIT, lkp_overload,       NULL },
+    { "ups.status", HID_USAGE_BS_FULLY_CHARGED,        0,
+      HID_ITEM_TYPE_FEATURE, UPS_MAP_STATUS_BIT, lkp_fully_charged,  NULL },
+    { "ups.status", HID_USAGE_PD_BOOST,                0,
+      HID_ITEM_TYPE_FEATURE, UPS_MAP_STATUS_BIT, lkp_boost,          NULL },
+    { "ups.status", HID_USAGE_PD_BUCK,                 0,
+      HID_ITEM_TYPE_FEATURE, UPS_MAP_STATUS_BIT, lkp_buck,           NULL },
+
+    /* --- additional battery -------------------------------------- */
+    { "battery.runtime.low",
+      HID_USAGE_BS_REMAINING_TIME_LIMIT,  0, HID_ITEM_TYPE_FEATURE,
+      UPS_MAP_SEMI_STATIC, NULL, NULL },
+    { "battery.voltage.nominal",
+      HID_USAGE_PD_CONFIG_VOLTAGE,        HID_USAGE_POWER_SUMMARY, HID_ITEM_TYPE_FEATURE,
+      UPS_MAP_SEMI_STATIC, NULL, ups_scale_voltage },
+
+    /* --- additional output --------------------------------------- */
+    { "output.voltage.nominal",
+      HID_USAGE_PD_CONFIG_VOLTAGE,        HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
+      UPS_MAP_SEMI_STATIC, NULL, ups_scale_voltage },
+
+    /* --- power --------------------------------------------------- */
+    { "ups.power",
+      HID_USAGE_PD_APPARENT_POWER,        0, HID_ITEM_TYPE_FEATURE,
+      0, NULL, NULL },
+    { "ups.power.nominal",
+      HID_USAGE_PD_CONFIG_APPARENT_POWER, 0, HID_ITEM_TYPE_FEATURE,
+      UPS_MAP_SEMI_STATIC, NULL, NULL },
 
     /* sentinel */
     { NULL, 0, 0, HID_ITEM_TYPE_FEATURE, 0, NULL, NULL }

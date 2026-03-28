@@ -532,8 +532,22 @@ static void poll_all_vars(void)
         if (*buf) set_var(e->nut_name, buf);
     }
 
-    if (got_status)
+    if (got_status) {
+        /* CPS quirk: suppress CHRG when battery is at 100% */
+        if (s_subdriver == &cps_subdriver && strstr(status_buf, "CHRG")) {
+            const char *chg = ups_driver_get_var("battery.charge");
+            if (chg && strtof(chg, NULL) >= 100.0f) {
+                /* Remove " CHRG" or "CHRG " from the status string */
+                char *p = strstr(status_buf, " CHRG");
+                if (p) memmove(p, p + 5, strlen(p + 5) + 1);
+                else if ((p = strstr(status_buf, "CHRG ")))
+                    memmove(p, p + 5, strlen(p + 5) + 1);
+                else if ((p = strstr(status_buf, "CHRG")))
+                    *p = '\0';
+            }
+        }
         set_var("ups.status", *status_buf ? status_buf : "OFF");
+    }
 
     /* Derive ups.realpower = ups.load% × ups.realpower.nominal / 100
      * Skip if an external power sensor is configured (fed via MQTT) */

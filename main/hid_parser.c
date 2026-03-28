@@ -327,7 +327,10 @@ double hid_scale_value(int32_t logical, const hid_field_t *f)
      * adjusted_exp = unit_exp - canonical_exp
      * physical *= 10^adjusted_exp  */
     int8_t canon = 0;
-    if (f->unit == 0x00F0D121u || f->unit == 0x0000D121u) canon = 7;
+    if (f->unit == 0x00F0D121u) canon = 7;        /* Voltage (V) */
+    else if (f->unit == 0x0000D121u) canon = 7;   /* Power/VA (W or VA) */
+    else if (f->unit == 0x0000D120u) canon = 7;   /* Current (A) */
+    /* Temperature (K), Frequency (Hz), Time (s) default to canon=0 */
 
     int exp = (int)f->unit_exp - (int)canon;
     /* Avoid pow() dependency — multiply/divide by 10 in a loop.

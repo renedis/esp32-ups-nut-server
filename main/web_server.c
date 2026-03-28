@@ -111,14 +111,23 @@ static esp_err_t handle_api_status(httpd_req_t *req)
     ADDF("battery.charge",          "%.2f", d.battery_charge);
     ADDF("battery.runtime",         "%.0f", d.battery_runtime);
     ADDF("battery.voltage",         "%.2f", d.battery_voltage);
+    ADDF("battery.voltage.nominal", "%.2f", d.battery_voltage_nominal);
     ADDF("battery.charge.low",      "%.2f", d.battery_charge_low);
     ADDF("battery.charge.warning",  "%.2f", d.battery_charge_warning);
     ADDF("battery.temperature",     "%.2f", d.battery_temperature);
     ADDF("input.voltage",           "%.2f", d.input_voltage);
+    ADDF("input.voltage.nominal",   "%.2f", d.input_voltage_nominal);
+    ADDF("input.frequency",         "%.2f", d.input_frequency);
+    ADDF("input.transfer.low",      "%.2f", d.input_transfer_low);
+    ADDF("input.transfer.high",     "%.2f", d.input_transfer_high);
+    ADDF("output.voltage",          "%.2f", d.output_voltage);
+    ADDF("output.current",          "%.2f", d.output_current);
+    ADDF("output.frequency",        "%.2f", d.output_frequency);
     ADDF("ups.load",                "%.2f", d.ups_load);
     ADDF("ups.temperature",         "%.2f", d.ups_temperature);
     ADDF("ups.realpower.nominal",   "%.0f", d.ups_realpower_nominal);
     ADDF("ups.realpower",           "%.2f", d.ups_realpower);
+    cJSON_AddStringToObject(root, "ups.beeper.status", d.ups_beeper_status);
 #undef ADDF
 
     /* USB debug fields */

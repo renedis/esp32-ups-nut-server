@@ -259,6 +259,47 @@ static esp_err_t handle_api_log(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ── GET /api/overrides ──────────────────────────────────────────────── */
+static esp_err_t handle_api_overrides_get(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_sendstr(req, nvs_overrides_get_json());
+    return ESP_OK;
+}
+
+/* ── POST /api/overrides ─��──────��────────────────────────────────────── */
+static esp_err_t handle_api_overrides_post(httpd_req_t *req)
+{
+    int content_len = req->content_len;
+    if (content_len <= 0 || content_len > 3900) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid size");
+        return ESP_FAIL;
+    }
+    char *buf = malloc(content_len + 1);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_FAIL;
+    }
+    int total = 0, r;
+    while (total < content_len) {
+        r = httpd_req_recv(req, buf + total, content_len - total);
+        if (r <= 0) { free(buf); httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Recv error"); return ESP_FAIL; }
+        total += r;
+    }
+    buf[total] = '\0';
+
+    esp_err_t err = nvs_overrides_save(buf);
+    free(buf);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true}");
+    return ESP_OK;
+}
+
 /* ── Deferred restart task — clean shutdown outside httpd context ──── */
 static void ota_restart_task(void *arg)
 {
@@ -425,6 +466,8 @@ static const httpd_uri_t s_routes[] = {
     { .uri="/api/config", .method=HTTP_POST, .handler=handle_api_config_post },
     { .uri="/api/hid",    .method=HTTP_GET,  .handler=handle_api_hid        },
     { .uri="/api/log",    .method=HTTP_GET,  .handler=handle_api_log        },
+    { .uri="/api/overrides", .method=HTTP_GET,  .handler=handle_api_overrides_get },
+    { .uri="/api/overrides", .method=HTTP_POST, .handler=handle_api_overrides_post },
     { .uri="/api/ota",    .method=HTTP_POST, .handler=handle_ota,
       .user_ctx=NULL },
 };
@@ -436,7 +479,7 @@ esp_err_t web_server_start(void)
 
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port      = 80;
-    cfg.max_uri_handlers = 12;
+    cfg.max_uri_handlers = 16;
     cfg.stack_size       = 16384;
     cfg.lru_purge_enable = true;
     cfg.ctrl_port        = 32769;  /* avoid potential bind conflict after OTA reboot */

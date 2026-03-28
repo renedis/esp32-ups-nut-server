@@ -92,6 +92,14 @@ progress::-webkit-progress-value{background:#89b4fa;border-radius:4px;transition
 .ota-status.ok{color:#a6e3a1}
 .ota-status.err{color:#f38ba8}
 @media(max-width:768px){.layout{flex-direction:column;padding:1rem}.sidebar{width:100%;flex-direction:row;overflow-x:auto;position:static;gap:.25rem}.sidebar-btn{white-space:nowrap;padding:.5rem .7rem;font-size:.8rem}}
+.ovr-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.ovr-table th{text-align:left;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--base-content-muted);padding:.5rem .6rem;border-bottom:1px solid var(--border-color)}
+.ovr-table td{padding:.35rem .6rem;border-bottom:1px solid var(--border-color);vertical-align:middle}
+.ovr-table td:first-child{font-family:var(--font-mono);font-size:.78rem;color:var(--primary);white-space:nowrap}
+.ovr-table td:nth-child(2){font-family:var(--font-mono);font-size:.78rem;color:var(--base-content-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovr-table input{width:100%;background:var(--base-200);border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.35rem .6rem;font-size:.8rem;color:var(--base-content);font-family:var(--font-mono);outline:none;transition:border-color .15s}
+.ovr-table input:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.ovr-table input.has-override{border-color:rgba(250,204,21,.4);background:rgba(250,204,21,.05)}
 footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color)}
 </style>
 </head>
@@ -132,6 +140,10 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
     <button class="sidebar-btn" onclick="showPanel('ota')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Firmware OTA
+    </button>
+    <button class="sidebar-btn" onclick="showPanel('overrides')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Overrides
     </button>
     <button class="sidebar-btn" onclick="showPanel('dev')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
@@ -303,6 +315,31 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
       </div>
     </div>
 
+    <!-- Overrides -->
+    <div id="panel-overrides" class="panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Variable Overrides</div>
+          <div class="card-subtitle">Override NUT variable values. Empty fields use the live value from the UPS.</div>
+        </div>
+        <table class="ovr-table" id="ovr-table">
+          <thead><tr><th>Variable</th><th>Live Value</th><th>Override</th></tr></thead>
+          <tbody id="ovr-body"></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" onclick="clearOverrides()">Clear All</button>
+        <button type="button" class="btn btn-ghost" onclick="loadOverrides()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Discard
+        </button>
+        <button type="button" class="btn btn-primary" onclick="saveOverrides()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save Overrides
+        </button>
+      </div>
+    </div>
+
     <!-- Development -->
     <div id="panel-dev" class="panel">
       <div class="console-toolbar">
@@ -328,6 +365,7 @@ function showPanel(name) {
   document.getElementById('panel-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
   if (name === 'console') refreshLog();
+  if (name === 'overrides') loadOverrides();
   if (name === 'dev') refreshHid();
 }
 
@@ -497,6 +535,76 @@ function waitReconnect() {
       if (r.ok) { clearInterval(iv); stat.textContent = 'Device is back online!'; stat.className = 'ota-status ok'; }
     } catch(e) {}
   }, 2000);
+}
+
+/* ── Overrides ── */
+let ovrData = {};   /* current saved overrides */
+let ovrVars = {};   /* live variable values */
+
+async function loadOverrides() {
+  try {
+    const [statusRes, ovrRes] = await Promise.all([
+      fetch('/api/status'), fetch('/api/overrides')
+    ]);
+    const status = await statusRes.json();
+    ovrData = await ovrRes.json();
+
+    /* Also fetch NUT vars via the list — status has formatted values,
+       but we also need raw NUT var names. Use /api/status keys that
+       don't start with '_' */
+    ovrVars = {};
+    for (const [k, v] of Object.entries(status)) {
+      if (!k.startsWith('_')) ovrVars[k] = String(v);
+    }
+
+    renderOverrideTable();
+  } catch(e) { showToast('Failed to load overrides', 'err'); }
+}
+
+function renderOverrideTable() {
+  const tbody = document.getElementById('ovr-body');
+  tbody.innerHTML = '';
+  const allKeys = new Set([...Object.keys(ovrVars), ...Object.keys(ovrData)]);
+  const sorted = [...allKeys].sort();
+  for (const key of sorted) {
+    const live = ovrVars[key] || '';
+    const ovr  = ovrData[key] || '';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + key + '</td>' +
+      '<td title="' + live.replace(/"/g,'&quot;') + '">' + live + '</td>' +
+      '<td><input data-var="' + key + '" value="' + ovr.replace(/"/g,'&quot;') + '" class="' + (ovr ? 'has-override' : '') + '"></td>';
+    tbody.appendChild(tr);
+  }
+  /* highlight on input */
+  tbody.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      inp.classList.toggle('has-override', inp.value.trim() !== '');
+    });
+  });
+}
+
+function clearOverrides() {
+  document.querySelectorAll('#ovr-body input').forEach(inp => {
+    inp.value = ''; inp.classList.remove('has-override');
+  });
+}
+
+async function saveOverrides() {
+  const payload = {};
+  document.querySelectorAll('#ovr-body input').forEach(inp => {
+    const v = inp.value.trim();
+    if (v) payload[inp.dataset.var] = v;
+  });
+  try {
+    const r = await fetch('/api/overrides', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(r.status);
+    ovrData = payload;
+    showToast('Overrides saved', 'ok');
+  } catch(e) { showToast('Failed to save overrides', 'err'); }
 }
 
 /* ── Init ── */

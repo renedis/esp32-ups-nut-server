@@ -3,12 +3,21 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "nvs_config.h"
+#include "cJSON.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "nvs_cfg";
 #define NVS_NS "nut_cfg"
 
 static nvs_cfg_t s_cfg;
+
+static void overrides_load(void);
+
+/* ── Variable overrides ─────────────────────────────────────────────── */
+typedef struct { char name[40]; char value[64]; } override_entry_t;
+static override_entry_t s_overrides[MAX_OVERRIDES];
+static int              s_override_count = 0;
+static char             s_overrides_json[4000] = "{}";
 
 static const nvs_cfg_t s_defaults = {
     .ups_name      = "apc",
@@ -52,6 +61,7 @@ esp_err_t nvs_config_init(void)
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "No saved config, using defaults");
         memcpy(&s_cfg, &s_defaults, sizeof(s_cfg));
+        overrides_load();
         return ESP_OK;
     }
     if (err != ESP_OK) return err;
@@ -75,6 +85,7 @@ esp_err_t nvs_config_init(void)
     s_cfg.mqtt_en = (bool)en;
 
     nvs_close(h);
+    overrides_load();
     ESP_LOGI(TAG, "Config loaded from NVS");
     return ESP_OK;
 }
@@ -110,6 +121,67 @@ esp_err_t nvs_config_save(const nvs_cfg_t *cfg)
     if (err == ESP_OK) {
         memcpy(&s_cfg, cfg, sizeof(s_cfg));
         ESP_LOGI(TAG, "Config saved to NVS");
+    }
+    return err;
+}
+
+/* ── Variable overrides ─────────────────────────────────────────────── */
+static void parse_overrides_json(const char *json)
+{
+    cJSON *root = cJSON_Parse(json);
+    s_override_count = 0;
+    if (!root) return;
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, root) {
+        if (s_override_count >= MAX_OVERRIDES) break;
+        if (!cJSON_IsString(item) || !item->valuestring[0]) continue;
+        strlcpy(s_overrides[s_override_count].name, item->string, sizeof(s_overrides[0].name));
+        strlcpy(s_overrides[s_override_count].value, item->valuestring, sizeof(s_overrides[0].value));
+        s_override_count++;
+    }
+    cJSON_Delete(root);
+    ESP_LOGI(TAG, "Loaded %d variable overrides", s_override_count);
+}
+
+static void overrides_load(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) return;
+    size_t len = sizeof(s_overrides_json);
+    if (nvs_get_str(h, "overrides", s_overrides_json, &len) != ESP_OK)
+        strlcpy(s_overrides_json, "{}", sizeof(s_overrides_json));
+    nvs_close(h);
+    parse_overrides_json(s_overrides_json);
+}
+
+const char *nvs_override_get(const char *var_name)
+{
+    for (int i = 0; i < s_override_count; i++) {
+        if (strcmp(s_overrides[i].name, var_name) == 0)
+            return s_overrides[i].value;
+    }
+    return NULL;
+}
+
+const char *nvs_overrides_get_json(void)
+{
+    return s_overrides_json;
+}
+
+esp_err_t nvs_overrides_save(const char *json)
+{
+    if (strlen(json) >= sizeof(s_overrides_json) - 1) return ESP_ERR_NO_MEM;
+
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+    err = nvs_set_str(h, "overrides", json);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+
+    if (err == ESP_OK) {
+        strlcpy(s_overrides_json, json, sizeof(s_overrides_json));
+        parse_overrides_json(json);
     }
     return err;
 }

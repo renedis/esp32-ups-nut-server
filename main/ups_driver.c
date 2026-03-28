@@ -141,6 +141,10 @@ void ups_driver_set_var(const char *name, const char *value)
 
 const char *ups_driver_get_var(const char *name)
 {
+    /* Check overrides first */
+    const char *ovr = nvs_override_get(name);
+    if (ovr) return ovr;
+
     xSemaphoreTake(s_vars_mutex, portMAX_DELAY);
     for (int i = 0; i < UPS_VAR_COUNT; i++) {
         if (s_vars[i].valid && strcmp(s_vars[i].name, name) == 0) {
@@ -171,8 +175,9 @@ void ups_driver_list_vars_cb(void (*cb)(const char *name, const char *value, voi
 {
     xSemaphoreTake(s_vars_mutex, portMAX_DELAY);
     for (int i = 0; i < UPS_VAR_COUNT; i++) {
-        if (s_vars[i].valid)
-            cb(s_vars[i].name, s_vars[i].value, ctx);
+        if (!s_vars[i].valid) continue;
+        const char *ovr = nvs_override_get(s_vars[i].name);
+        cb(s_vars[i].name, ovr ? ovr : s_vars[i].value, ctx);
     }
     xSemaphoreGive(s_vars_mutex);
 }

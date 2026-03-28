@@ -292,9 +292,18 @@ int32_t hid_extract_field_value(const uint8_t *report, size_t report_len,
 
 double hid_scale_value(int32_t logical, const hid_field_t *f)
 {
-    /* Clamp to logical range (matches NUT's GetValue clamping) */
-    if (logical < f->logical_min) logical = f->logical_min;
-    if (logical > f->logical_max) logical = f->logical_max;
+    /* Fix unsigned wrap: when logical_max < logical_min (e.g. lmin=0, lmax=-1),
+     * the HID descriptor means "unsigned max for this field size".
+     * Common on CyberPower and other non-APC UPS devices. */
+    int32_t lmin = f->logical_min;
+    int32_t lmax = f->logical_max;
+    if (lmax < lmin && f->bit_size < 32) {
+        lmax = (int32_t)((1u << f->bit_size) - 1u);
+    }
+
+    /* Clamp to logical range */
+    if (logical < lmin) logical = lmin;
+    if (logical > lmax) logical = lmax;
 
     /* Step 1: Logical → Physical linear scaling.
      * If phy_min == phy_max == 0, skip (physical = logical). */
@@ -302,13 +311,13 @@ double hid_scale_value(int32_t logical, const hid_field_t *f)
     if (f->phy_min == 0 && f->phy_max == 0) {
         physical = (double)logical;
     } else {
-        double log_range = (double)(f->logical_max - f->logical_min);
+        double log_range = (double)(lmax - lmin);
         if (log_range == 0.0) {
             physical = (double)f->phy_min;
         } else {
             double phy_range = (double)(f->phy_max - f->phy_min);
             physical = (double)f->phy_min +
-                       (double)(logical - f->logical_min) * phy_range / log_range;
+                       (double)(logical - lmin) * phy_range / log_range;
         }
     }
 

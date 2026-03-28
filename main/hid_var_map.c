@@ -93,14 +93,15 @@ const ups_var_map_t hid_var_map_standard[] = {
       UPS_MAP_STATIC, NULL, ups_scale_mfr_date },
 
     /* --- input ---------------------------------------------------- */
+    /* Most UPS (APC, CPS, etc.) put input under Flow (0x84001A) */
     { "input.voltage",
-      HID_USAGE_PD_VOLTAGE,        HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
+      HID_USAGE_PD_VOLTAGE,        HID_USAGE_PD_FLOW, HID_ITEM_TYPE_FEATURE,
       0, NULL, ups_scale_voltage },
     { "input.voltage.nominal",
-      HID_USAGE_PD_CONFIG_VOLTAGE, HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
+      HID_USAGE_PD_CONFIG_VOLTAGE, HID_USAGE_PD_FLOW, HID_ITEM_TYPE_FEATURE,
       UPS_MAP_SEMI_STATIC, NULL, ups_scale_voltage },
     { "input.frequency",
-      HID_USAGE_PD_FREQUENCY,      HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
+      HID_USAGE_PD_FREQUENCY,      HID_USAGE_PD_FLOW, HID_ITEM_TYPE_FEATURE,
       0, NULL, ups_scale_frequency },
     { "input.transfer.low",
       HID_USAGE_PD_LOW_VOLTAGE_TRANSFER,  0, HID_ITEM_TYPE_FEATURE,
@@ -110,14 +111,15 @@ const ups_var_map_t hid_var_map_standard[] = {
       UPS_MAP_SEMI_STATIC, NULL, ups_scale_voltage },
 
     /* --- output --------------------------------------------------- */
+    /* CPS uses Output (0x84001C); APC has its own map with AC_OUTPUT (0x840016) */
     { "output.voltage",
-      HID_USAGE_PD_VOLTAGE,   HID_USAGE_PD_OUTPUT, HID_ITEM_TYPE_FEATURE,
+      HID_USAGE_PD_VOLTAGE,   HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
       0, NULL, ups_scale_voltage },
     { "output.current",
-      HID_USAGE_PD_CURRENT,   HID_USAGE_PD_OUTPUT, HID_ITEM_TYPE_FEATURE,
+      HID_USAGE_PD_CURRENT,   HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
       0, NULL, ups_scale_current },
     { "output.frequency",
-      HID_USAGE_PD_FREQUENCY, HID_USAGE_PD_OUTPUT, HID_ITEM_TYPE_FEATURE,
+      HID_USAGE_PD_FREQUENCY, HID_USAGE_PD_INPUT, HID_ITEM_TYPE_FEATURE,
       0, NULL, ups_scale_frequency },
 
     /* --- UPS ------------------------------------------------------ */

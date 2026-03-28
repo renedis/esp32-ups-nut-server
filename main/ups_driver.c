@@ -535,8 +535,9 @@ static void poll_all_vars(void)
     if (got_status)
         set_var("ups.status", *status_buf ? status_buf : "OFF");
 
-    /* Derive ups.realpower = ups.load% × ups.realpower.nominal / 100 */
-    {
+    /* Derive ups.realpower = ups.load% × ups.realpower.nominal / 100
+     * Skip if an external power sensor is configured (fed via MQTT) */
+    if (nvs_config_get()->power_topic[0] == '\0') {
         const char *load_s    = ups_driver_get_var("ups.load");
         const char *nominal_s = ups_driver_get_var("ups.realpower.nominal");
         if (load_s && nominal_s) {

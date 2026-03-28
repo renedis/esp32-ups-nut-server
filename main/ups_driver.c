@@ -167,6 +167,16 @@ void ups_driver_list_vars(char *buf, size_t buf_len)
     xSemaphoreGive(s_vars_mutex);
 }
 
+void ups_driver_list_vars_cb(void (*cb)(const char *name, const char *value, void *ctx), void *ctx)
+{
+    xSemaphoreTake(s_vars_mutex, portMAX_DELAY);
+    for (int i = 0; i < UPS_VAR_COUNT; i++) {
+        if (s_vars[i].valid)
+            cb(s_vars[i].name, s_vars[i].value, ctx);
+    }
+    xSemaphoreGive(s_vars_mutex);
+}
+
 bool        ups_driver_is_connected(void)  { return s_usb_connected; }
 void        ups_driver_get_last_usb(uint16_t *vid, uint16_t *pid, bool *ever_seen)
 {

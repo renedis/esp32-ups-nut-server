@@ -66,17 +66,26 @@ static void handle_list_ups(int fd)
         nut_ups_name(), ups_description());
 }
 
+/* Callback: send one VAR line per variable directly to the client socket */
+typedef struct { int fd; const char *uname; } list_var_ctx_t;
+
+static void list_var_cb(const char *name, const char *value, void *ctx)
+{
+    list_var_ctx_t *c = (list_var_ctx_t *)ctx;
+    client_sendf(c->fd, "VAR %s %s \"%s\"\n", c->uname, name, value);
+}
+
 static void handle_list_var(int fd, const char *ups_name)
 {
     if (strcmp(ups_name, nut_ups_name()) != 0) {
         client_sendf(fd, "ERR UNKNOWN-UPS\n");
         return;
     }
-    char buf[TX_BUF_SIZE];
-    client_sendf(fd, "BEGIN LIST VAR %s\n", nut_ups_name());
-    ups_driver_list_vars(buf, sizeof(buf));
-    send(fd, buf, strlen(buf), 0);
-    client_sendf(fd, "END LIST VAR %s\n", nut_ups_name());
+    const char *uname = nut_ups_name();
+    client_sendf(fd, "BEGIN LIST VAR %s\n", uname);
+    list_var_ctx_t ctx = { .fd = fd, .uname = uname };
+    ups_driver_list_vars_cb(list_var_cb, &ctx);
+    client_sendf(fd, "END LIST VAR %s\n", uname);
 }
 
 static void process_line(nut_client_t *client, char *line)

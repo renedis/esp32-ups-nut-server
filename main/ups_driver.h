@@ -77,6 +77,7 @@ void        ups_driver_poll_task(void *arg);
 const char *ups_driver_get_var(const char *name);
 void        ups_driver_set_var(const char *name, const char *value);
 void        ups_driver_list_vars(char *buf, size_t buf_len);
+void        ups_driver_list_vars_cb(void (*cb)(const char *name, const char *value, void *ctx), void *ctx);
 
 /* Populate a ups_data_t snapshot (used by web/MQTT). */
 void        ups_driver_get_data(ups_data_t *out);

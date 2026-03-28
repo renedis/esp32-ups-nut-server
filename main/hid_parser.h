@@ -13,9 +13,11 @@
 #define HID_USAGE_UPS                   USAGE(0x84, 0x04)
 #define HID_USAGE_POWER_SUMMARY         USAGE(0x84, 0x05)
 #define HID_USAGE_PRESENT_STATUS        USAGE(0x84, 0x02)
-#define HID_USAGE_PD_INPUT              USAGE(0x84, 0x1C)
-#define HID_USAGE_PD_OUTPUT             USAGE(0x84, 0x1D)
-#define HID_USAGE_PD_FLOW               USAGE(0x84, 0x1E)
+#define HID_USAGE_PD_INPUT              USAGE(0x84, 0x1C)  /* Standard UPS Input subcollection */
+#define HID_USAGE_PD_OUTPUT             USAGE(0x84, 0x1D)  /* Standard UPS Output subcollection */
+#define HID_USAGE_PD_FLOW               USAGE(0x84, 0x1A)  /* APC: AC input/flow subcollection */
+#define HID_USAGE_PD_AC_OUTPUT          USAGE(0x84, 0x16)  /* APC: AC output subcollection */
+#define HID_USAGE_PD_BATTERY            USAGE(0x84, 0x12)  /* APC: battery subcollection */
 /* USB HID Power Device page (0x84) — measurements */
 #define HID_USAGE_PD_VOLTAGE            USAGE(0x84, 0x30)
 #define HID_USAGE_PD_CURRENT            USAGE(0x84, 0x31)
@@ -75,6 +77,10 @@ typedef struct {
     uint8_t  bit_size;
     int32_t  logical_min;
     int32_t  logical_max;
+    int32_t  phy_min;       /* Physical Minimum (0 if not set) */
+    int32_t  phy_max;       /* Physical Maximum (0 if not set) */
+    uint32_t unit;          /* HID Unit type (e.g. 0x00F0D121 = voltage) */
+    int8_t   unit_exp;      /* HID Unit Exponent, sign-extended from 4 bits */
     hid_item_type_t item_type;
 } hid_field_t;
 
@@ -103,3 +109,16 @@ int32_t hid_extract_field_value(const uint8_t *report, size_t report_len,
                                 const hid_field_t *field);
 
 void hid_dump_report_map(const hid_report_map_t *map);
+
+/*
+ * Convert a raw logical value from the HID report into a physical value
+ * ready to display, applying:
+ *   1. Logical→Physical linear scaling (using phy_min/phy_max when set)
+ *   2. Unit exponent adjustment relative to NUT's canonical exponents:
+ *        Voltage  (0x00F0D121): canonical 7  → physical × 10^(unit_exp − 7)
+ *        Power/VA (0x0000D121): canonical 7  → physical × 10^(unit_exp − 7)
+ *        All others            : canonical 0  → physical × 10^unit_exp
+ *
+ * Clamps logical to [logical_min, logical_max] before scaling (matches NUT).
+ */
+double hid_scale_value(int32_t logical, const hid_field_t *f);

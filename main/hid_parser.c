@@ -17,6 +17,10 @@ static const char *TAG = "hid_parser";
 #define HID_GLOBAL_USAGE_PAGE  0
 #define HID_GLOBAL_LOG_MIN     1
 #define HID_GLOBAL_LOG_MAX     2
+#define HID_GLOBAL_PHY_MIN     3
+#define HID_GLOBAL_PHY_MAX     4
+#define HID_GLOBAL_UNIT_EXP    5
+#define HID_GLOBAL_UNIT        6
 #define HID_GLOBAL_REPORT_SIZE 7
 #define HID_GLOBAL_REPORT_ID   8
 #define HID_GLOBAL_REPORT_CNT  9
@@ -31,6 +35,10 @@ typedef struct {
     uint16_t usage_page;
     int32_t  logical_min;
     int32_t  logical_max;
+    int32_t  phy_min;
+    int32_t  phy_max;
+    uint32_t unit;
+    int8_t   unit_exp;
     uint8_t  report_size;
     uint8_t  report_count;
     uint8_t  report_id;
@@ -76,7 +84,12 @@ esp_err_t hid_parse_report_descriptor(const uint8_t *desc, size_t len,
     uint32_t local_usage_max = 0;
     bool     have_usage_range = false;
 
-    uint16_t bit_offsets[256] = {0};
+    /* Separate bit-offset counters per item type (INPUT=0, OUTPUT=1, FEATURE=2).
+     * HID reports for different item types sharing the same report ID are
+     * independent: each starts at bit 0 in its own report buffer.
+     * Using a single counter would corrupt offsets on descriptors with
+     * interleaved Input/Feature items for the same report ID (e.g. APC). */
+    uint16_t bit_offsets[3][256] = {{0}};
 
     size_t i = 0;
     while (i < len) {
@@ -105,6 +118,21 @@ esp_err_t hid_parse_report_descriptor(const uint8_t *desc, size_t len,
                 break;
             case HID_GLOBAL_LOG_MAX:
                 global.logical_max = read_signed(data, item_size);
+                break;
+            case HID_GLOBAL_PHY_MIN:
+                global.phy_min = read_signed(data, item_size);
+                break;
+            case HID_GLOBAL_PHY_MAX:
+                global.phy_max = read_signed(data, item_size);
+                break;
+            case HID_GLOBAL_UNIT_EXP: {
+                /* 4-bit signed value: 0x0-0x7 = +0..+7, 0x8-0xF = -8..-1 */
+                uint8_t raw_exp = (uint8_t)(read_unsigned(data, item_size) & 0x0F);
+                global.unit_exp = (raw_exp > 7) ? (int8_t)(raw_exp | 0xF0) : (int8_t)raw_exp;
+                break;
+            }
+            case HID_GLOBAL_UNIT:
+                global.unit = read_unsigned(data, item_size);
                 break;
             case HID_GLOBAL_REPORT_SIZE:
                 global.report_size = (uint8_t)read_unsigned(data, item_size);
@@ -181,17 +209,21 @@ esp_err_t hid_parse_report_descriptor(const uint8_t *desc, size_t len,
                     hid_field_t *fld = &map->fields[map->count++];
                     fld->usage            = usage;
                     fld->report_id        = rid;
-                    fld->bit_offset       = bit_offsets[rid];
+                    fld->bit_offset       = bit_offsets[field_type][rid];
                     fld->bit_size         = global.report_size;
                     fld->logical_min      = global.logical_min;
                     fld->logical_max      = global.logical_max;
+                    fld->phy_min          = global.phy_min;
+                    fld->phy_max          = global.phy_max;
+                    fld->unit             = global.unit;
+                    fld->unit_exp         = global.unit_exp;
                     fld->item_type        = field_type;
                     fld->collection_depth = (uint8_t)(collection_depth < HID_MAX_DEPTH
                                                       ? collection_depth : HID_MAX_DEPTH);
                     memcpy(fld->collection_path, collection_path,
                            fld->collection_depth * sizeof(uint32_t));
 
-                    bit_offsets[rid] += global.report_size;
+                    bit_offsets[field_type][rid] += global.report_size;
                 }
 
                 local_usage_count = 0;
@@ -258,6 +290,45 @@ int32_t hid_extract_field_value(const uint8_t *report, size_t report_len,
     return (int32_t)raw;
 }
 
+double hid_scale_value(int32_t logical, const hid_field_t *f)
+{
+    /* Clamp to logical range (matches NUT's GetValue clamping) */
+    if (logical < f->logical_min) logical = f->logical_min;
+    if (logical > f->logical_max) logical = f->logical_max;
+
+    /* Step 1: Logical → Physical linear scaling.
+     * If phy_min == phy_max == 0, skip (physical = logical). */
+    double physical;
+    if (f->phy_min == 0 && f->phy_max == 0) {
+        physical = (double)logical;
+    } else {
+        double log_range = (double)(f->logical_max - f->logical_min);
+        if (log_range == 0.0) {
+            physical = (double)f->phy_min;
+        } else {
+            double phy_range = (double)(f->phy_max - f->phy_min);
+            physical = (double)f->phy_min +
+                       (double)(logical - f->logical_min) * phy_range / log_range;
+        }
+    }
+
+    /* Step 2: Unit exponent adjustment.
+     * NUT canonical exponents (from NUT's HIDUnits table):
+     *   Voltage (0x00F0D121) = 7, Power/VA (0x0000D121) = 7, all others = 0
+     * adjusted_exp = unit_exp - canonical_exp
+     * physical *= 10^adjusted_exp  */
+    int8_t canon = 0;
+    if (f->unit == 0x00F0D121u || f->unit == 0x0000D121u) canon = 7;
+
+    int exp = (int)f->unit_exp - (int)canon;
+    /* Avoid pow() dependency — multiply/divide by 10 in a loop.
+     * Practical range for |exp| is 0-9, so this is fast. */
+    if (exp > 0)      for (int i = 0; i < exp;  i++) physical *= 10.0;
+    else if (exp < 0) for (int i = 0; i > exp;  i--) physical /= 10.0;
+
+    return physical;
+}
+
 void hid_dump_report_map(const hid_report_map_t *map)
 {
     static const char *type_name[] = {"INPUT", "OUTPUT", "FEATURE"};
@@ -266,9 +337,13 @@ void hid_dump_report_map(const hid_report_map_t *map)
         const hid_field_t *f = &map->fields[i];
         ESP_LOGI(TAG,
                  "[%2u] %-7s rid=0x%02x usage=0x%08"PRIx32" bit_off=%3u bit_sz=%u "
-                 "lmin=%"PRId32" lmax=%"PRId32,
+                 "lmin=%"PRId32" lmax=%"PRId32" pmin=%"PRId32" pmax=%"PRId32
+                 " unit=0x%08"PRIx32" uexp=%d",
                  i, type_name[f->item_type], f->report_id, f->usage,
-                 f->bit_offset, f->bit_size, f->logical_min, f->logical_max);
+                 f->bit_offset, f->bit_size,
+                 f->logical_min, f->logical_max,
+                 f->phy_min, f->phy_max,
+                 f->unit, (int)f->unit_exp);
     }
     ESP_LOGI(TAG, "=== End HID Report Map ===");
 }

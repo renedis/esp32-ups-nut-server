@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ESP32 UPS — Configuration</title>
+<title>ESP32 UPS — Settings</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -31,12 +31,18 @@ a{color:inherit;text-decoration:none}
 .nav-link{display:flex;align-items:center;gap:.4rem;font-size:.875rem;font-weight:500;color:var(--base-content-muted);padding:.4rem .75rem;border-radius:var(--radius-field);transition:all .15s}
 .nav-link:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
 .nav-link.active{color:var(--base-content);background:rgba(255,255,255,.08)}
-.page{max-width:860px;margin:0 auto;padding:2rem 1.5rem}
-.page-header{margin-bottom:1.75rem}
-.page-title{font-size:1.25rem;font-weight:700;letter-spacing:-.01em;opacity:.85}
-.page-subtitle{font-size:.8rem;color:var(--base-content-muted);margin-top:.25rem}
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:1.5rem;gap:1.5rem;min-height:calc(100vh - 56px)}
+.sidebar{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:.2rem;position:sticky;top:72px;align-self:flex-start}
+.sidebar-btn{display:flex;align-items:center;gap:.6rem;font-size:.85rem;font-weight:500;color:var(--base-content-muted);padding:.6rem .85rem;border-radius:var(--radius-box);border:none;background:none;cursor:pointer;transition:all .15s;text-align:left;font-family:inherit;width:100%}
+.sidebar-btn:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
+.sidebar-btn.active{color:var(--base-content);background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25)}
+.sidebar-btn svg{opacity:.5;flex-shrink:0}
+.sidebar-btn.active svg{opacity:.9}
+.content{flex:1;min-width:0}
+.panel{display:none}
+.panel.active{display:block}
 .card{background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:1.5rem;margin-bottom:1rem}
-.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border-color)}
+.card-header{margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border-color)}
 .card-title{font-size:.9rem;font-weight:600;color:var(--base-content)}
 .card-subtitle{font-size:.75rem;color:var(--base-content-muted);margin-top:.2rem}
 .field{margin-bottom:1.1rem}
@@ -70,8 +76,23 @@ a{color:inherit;text-decoration:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:rgba(74,222,128,.4);color:var(--success)}
 .toast.err{border-color:rgba(248,113,113,.4);color:var(--error)}
-footer{max-width:860px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color);margin-top:.5rem}
-@media(max-width:640px){.page{padding:1.25rem 1rem}.navbar-center{display:none}.field-row{grid-template-columns:1fr}.actions{flex-direction:column}.btn{justify-content:center}}
+.console{background:#0d0f1a;border:1px solid var(--border-color);border-radius:var(--radius-box);padding:.75rem;font-family:var(--font-mono);font-size:.72rem;line-height:1.5;color:#94e2d5;height:calc(100vh - 200px);min-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.console-toolbar{display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem}
+.console-toolbar .btn{padding:.35rem .75rem;font-size:.75rem}
+.hid-dump{background:#0d0f1a;border:1px solid var(--border-color);border-radius:var(--radius-box);padding:.75rem;font-family:var(--font-mono);font-size:.7rem;line-height:1.6;color:#cba6f7;height:calc(100vh - 200px);min-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.drop{border:2px dashed #45475a;border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:1rem}
+.drop.hover{border-color:#89b4fa;background:#313244}
+.drop input{display:none}
+.drop-label{font-size:.9rem;color:#6c7086}
+.drop-name{font-size:.85rem;color:#a6e3a1;margin-top:.5rem;word-break:break-all}
+progress{width:100%;height:8px;border-radius:4px;appearance:none;-webkit-appearance:none;margin-bottom:.75rem;display:none}
+progress::-webkit-progress-bar{background:#313244;border-radius:4px}
+progress::-webkit-progress-value{background:#89b4fa;border-radius:4px;transition:width .1s}
+.ota-status{margin-top:.75rem;font-size:.85rem;min-height:1.2em;text-align:center}
+.ota-status.ok{color:#a6e3a1}
+.ota-status.err{color:#f38ba8}
+@media(max-width:768px){.layout{flex-direction:column;padding:1rem}.sidebar{width:100%;flex-direction:row;overflow-x:auto;position:static;gap:.25rem}.sidebar-btn{white-space:nowrap;padding:.5rem .7rem;font-size:.8rem}}
+footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color)}
 </style>
 </head>
 <body>
@@ -88,156 +109,243 @@ footer{max-width:860px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;c
     </a>
     <a href="/config" class="nav-link active">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-      Configuration
+      Settings
     </a>
   </div>
   <div></div>
 </nav>
 
-<main class="page">
-  <div class="page-header">
-    <div class="page-title">Configuration</div>
-    <div class="page-subtitle">Manage NUT server and MQTT settings</div>
-  </div>
+<div class="layout">
+  <aside class="sidebar">
+    <button class="sidebar-btn active" onclick="showPanel('nut')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      NUT Server
+    </button>
+    <button class="sidebar-btn" onclick="showPanel('mqtt')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      MQTT
+    </button>
+    <button class="sidebar-btn" onclick="showPanel('console')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      Serial Console
+    </button>
+    <button class="sidebar-btn" onclick="showPanel('ota')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Firmware OTA
+    </button>
+    <button class="sidebar-btn" onclick="showPanel('dev')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Development
+    </button>
+  </aside>
 
-  <form id="cfg-form">
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <div class="card-title">NUT Server</div>
-          <div class="card-subtitle">Network UPS Tools protocol settings</div>
+  <main class="content">
+    <!-- NUT Server -->
+    <div id="panel-nut" class="panel active">
+      <form id="cfg-form">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">NUT Server</div>
+            <div class="card-subtitle">Network UPS Tools protocol settings</div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="ups_name">UPS Name</label>
+              <input id="ups_name" name="ups_name" type="text" maxlength="31">
+              <div class="field-hint">Identifier used in NUT protocol commands (e.g. LIST UPS)</div>
+            </div>
+            <div class="field">
+              <label for="ups_desc">UPS Description</label>
+              <input id="ups_desc" name="ups_desc" type="text" maxlength="63">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="nut_user">NUT Username</label>
+              <input id="nut_user" name="nut_user" type="text" maxlength="31">
+            </div>
+            <div class="field">
+              <label for="nut_pass">NUT Password</label>
+              <input id="nut_pass" name="nut_pass" type="password" maxlength="63">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="nut_port">TCP Port</label>
+              <input id="nut_port" name="nut_port" type="number" min="1" max="65535" placeholder="3493">
+            </div>
+            <div class="field">
+              <label for="poll_ms">Poll Interval (ms)</label>
+              <input id="poll_ms" name="poll_ms" type="number" min="500" max="30000" step="500" placeholder="2000">
+              <div class="field-hint">How often USB HID GET_REPORT is sent to the UPS</div>
+            </div>
+          </div>
         </div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" onclick="loadConfig()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Discard
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save &amp; Apply
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- MQTT -->
+    <div id="panel-mqtt" class="panel">
+      <form id="mqtt-form">
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div class="card-title">MQTT</div>
+              <div class="card-subtitle">Publish UPS telemetry to a broker</div>
+            </div>
+            <div class="toggle-wrap">
+              <label class="toggle"><input type="checkbox" id="mqtt_en" name="mqtt_en"><span class="toggle-slider"></span></label>
+              <span class="toggle-label" id="mqtt-toggle-label">Disabled</span>
+            </div>
+          </div>
+          <div id="mqtt-fields">
+            <div class="field">
+              <label for="mqtt_uri">Broker URI</label>
+              <input id="mqtt_uri" name="mqtt_uri" type="text" maxlength="127" placeholder="mqtt://192.168.1.10:1883">
+              <div class="field-hint">Supports mqtt://, mqtts://, ws://, wss://</div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="mqtt_user">Username</label>
+                <input id="mqtt_user" name="mqtt_user" type="text" maxlength="63" placeholder="(optional)">
+              </div>
+              <div class="field">
+                <label for="mqtt_pass">Password</label>
+                <input id="mqtt_pass" name="mqtt_pass" type="password" maxlength="63" placeholder="(optional)">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="mqtt_prefix">Topic Prefix</label>
+                <input id="mqtt_prefix" name="mqtt_prefix" type="text" maxlength="63" placeholder="homeassistant/sensor/ups" oninput="updatePreview()">
+                <div class="topic-preview" id="topic-preview">homeassistant/sensor/ups/battery/charge</div>
+              </div>
+              <div class="field">
+                <label for="mqtt_interval">Publish Interval (s)</label>
+                <input id="mqtt_interval" name="mqtt_interval" type="number" min="5" max="3600" placeholder="30">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="mqtt_qos">QoS Level</label>
+                <select id="mqtt_qos" name="mqtt_qos">
+                  <option value="0">0 &mdash; At most once</option>
+                  <option value="1" selected>1 &mdash; At least once</option>
+                  <option value="2">2 &mdash; Exactly once</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="mqtt_ha">Home Assistant Discovery</label>
+                <select id="mqtt_ha" name="mqtt_ha">
+                  <option value="1" selected>Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" onclick="loadConfig()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Discard
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save &amp; Apply
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Serial Console -->
+    <div id="panel-console" class="panel">
+      <div class="console-toolbar">
+        <button class="btn btn-ghost" onclick="refreshLog()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Refresh
+        </button>
+        <label class="toggle-wrap" style="margin-left:auto">
+          <label class="toggle"><input type="checkbox" id="log-auto" checked><span class="toggle-slider"></span></label>
+          <span class="toggle-label">Auto-scroll</span>
+        </label>
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="ups_name">UPS Name</label>
-          <input id="ups_name" name="ups_name" type="text" maxlength="31" placeholder="apc">
-          <div class="field-hint">Identifier used in NUT protocol commands (e.g. LIST UPS)</div>
+      <div class="console" id="log-output">(loading...)</div>
+    </div>
+
+    <!-- Firmware OTA -->
+    <div id="panel-ota" class="panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Firmware Update</div>
+          <div class="card-subtitle">Upload a new .bin firmware image over-the-air</div>
         </div>
-        <div class="field">
-          <label for="ups_desc">UPS Description</label>
-          <input id="ups_desc" name="ups_desc" type="text" maxlength="63" placeholder="APC Back-UPS BE850G2">
+        <div class="drop" id="ota-drop" onclick="document.getElementById('ota-file').click()">
+          <input type="file" id="ota-file" accept=".bin">
+          <div class="drop-label">Click or drag a .bin file here</div>
+          <div class="drop-name" id="ota-filename"></div>
         </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="nut_user">NUT Username</label>
-          <input id="nut_user" name="nut_user" type="text" maxlength="31" placeholder="upsmon">
-        </div>
-        <div class="field">
-          <label for="nut_pass">NUT Password</label>
-          <input id="nut_pass" name="nut_pass" type="password" maxlength="63" placeholder="••••••••">
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="nut_port">TCP Port</label>
-          <input id="nut_port" name="nut_port" type="number" min="1" max="65535" placeholder="3493">
-        </div>
-        <div class="field">
-          <label for="poll_ms">Poll Interval (ms)</label>
-          <input id="poll_ms" name="poll_ms" type="number" min="500" max="30000" step="500" placeholder="2000">
-          <div class="field-hint">How often USB HID GET_REPORT is sent to the UPS</div>
-        </div>
+        <progress id="ota-progress" value="0" max="100"></progress>
+        <button class="btn btn-primary" id="ota-btn" disabled onclick="doOta()" style="width:100%">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Upload &amp; Flash
+        </button>
+        <div class="ota-status" id="ota-status"></div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <div class="card-title">MQTT</div>
-          <div class="card-subtitle">Publish UPS telemetry to a broker</div>
-        </div>
-        <div class="toggle-wrap">
-          <label class="toggle">
-            <input type="checkbox" id="mqtt_en" name="mqtt_en">
-            <span class="toggle-slider"></span>
-          </label>
-          <span class="toggle-label" id="mqtt-toggle-label">Disabled</span>
-        </div>
+    <!-- Development -->
+    <div id="panel-dev" class="panel">
+      <div class="console-toolbar">
+        <button class="btn btn-ghost" onclick="refreshHid()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Refresh
+        </button>
+        <span style="font-size:.75rem;color:var(--base-content-muted);margin-left:.5rem">HID Report Map &mdash; parsed USB descriptor fields</span>
       </div>
-      <div id="mqtt-fields">
-        <div class="field">
-          <label for="mqtt_uri">Broker URI</label>
-          <input id="mqtt_uri" name="mqtt_uri" type="text" maxlength="127" placeholder="mqtt://192.168.1.10:1883">
-          <div class="field-hint">Supports mqtt://, mqtts://, ws://, wss://</div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="mqtt_user">Username</label>
-            <input id="mqtt_user" name="mqtt_user" type="text" maxlength="63" placeholder="(optional)">
-          </div>
-          <div class="field">
-            <label for="mqtt_pass">Password</label>
-            <input id="mqtt_pass" name="mqtt_pass" type="password" maxlength="63" placeholder="(optional)">
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="mqtt_prefix">Topic Prefix</label>
-            <input id="mqtt_prefix" name="mqtt_prefix" type="text" maxlength="63" placeholder="homeassistant/sensor/ups" oninput="updatePreview()">
-            <div class="topic-preview" id="topic-preview">homeassistant/sensor/ups/battery/charge</div>
-          </div>
-          <div class="field">
-            <label for="mqtt_interval">Publish Interval (s)</label>
-            <input id="mqtt_interval" name="mqtt_interval" type="number" min="5" max="3600" placeholder="30">
-          </div>
-        </div>
-        <div class="field">
-          <label for="mqtt_qos">QoS Level</label>
-          <select id="mqtt_qos" name="mqtt_qos">
-            <option value="0">0 — At most once (fire and forget)</option>
-            <option value="1" selected>1 — At least once</option>
-            <option value="2">2 — Exactly once</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="mqtt_ha">Home Assistant Discovery</label>
-          <select id="mqtt_ha" name="mqtt_ha">
-            <option value="1" selected>Enabled — publish discovery messages</option>
-            <option value="0">Disabled</option>
-          </select>
-          <div class="field-hint">Publishes MQTT discovery config so HA auto-creates entities</div>
-        </div>
-      </div>
+      <div class="hid-dump" id="hid-output">(loading...)</div>
     </div>
-
-    <div class="actions">
-      <button type="button" class="btn btn-ghost" onclick="loadConfig()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        Discard
-      </button>
-      <button type="submit" class="btn btn-primary">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save &amp; Apply
-      </button>
-    </div>
-  </form>
-</main>
+  </main>
+</div>
 
 <footer>ESP32-P4 NUT Server</footer>
 <div class="toast" id="toast"></div>
 
 <script>
+/* ── Panel navigation ── */
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'console') refreshLog();
+  if (name === 'dev') refreshHid();
+}
+
+/* ── Toast ── */
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ── MQTT preview ── */
 function updatePreview() {
   const prefix = document.getElementById('mqtt_prefix').value || 'homeassistant/sensor/ups';
   document.getElementById('topic-preview').textContent = prefix + '/battery/charge';
 }
-const mqttEn = document.getElementById('mqtt_en');
-const mqttFields = document.getElementById('mqtt-fields');
-const mqttLabel = document.getElementById('mqtt-toggle-label');
-mqttEn.addEventListener('change', () => {
-  const on = mqttEn.checked;
-  mqttLabel.textContent = on ? 'Enabled' : 'Disabled';
-  mqttFields.classList.toggle('disabled-overlay', !on);
-});
-function showToast(msg, type) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast ' + type;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
-}
+
+/* ── Config load/save ── */
 function setField(id, val) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -245,64 +353,155 @@ function setField(id, val) {
   else if (el.type === 'select-one') el.value = String(val);
   else el.value = val !== undefined && val !== null ? val : '';
 }
+
 async function loadConfig() {
   try {
     const r = await fetch('/api/config');
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
-    setField('ups_name',      d.ups_name);
-    setField('ups_desc',      d.ups_desc);
-    setField('nut_user',      d.nut_user);
-    setField('nut_pass',      d.nut_pass);
-    setField('nut_port',      d.nut_port);
-    setField('poll_ms',       d.poll_ms);
-    setField('mqtt_en',       d.mqtt_en);
-    setField('mqtt_uri',      d.mqtt_uri);
-    setField('mqtt_user',     d.mqtt_user);
-    setField('mqtt_pass',     d.mqtt_pass);
-    setField('mqtt_prefix',   d.mqtt_prefix);
-    setField('mqtt_interval', d.mqtt_interval);
-    setField('mqtt_qos',      d.mqtt_qos);
-    setField('mqtt_ha',       d.mqtt_ha);
-    mqttLabel.textContent = d.mqtt_en ? 'Enabled' : 'Disabled';
-    mqttFields.classList.toggle('disabled-overlay', !d.mqtt_en);
+    setField('ups_name', d.ups_name); setField('ups_desc', d.ups_desc);
+    setField('nut_user', d.nut_user); setField('nut_pass', d.nut_pass);
+    setField('nut_port', d.nut_port); setField('poll_ms', d.poll_ms);
+    setField('mqtt_en', d.mqtt_en); setField('mqtt_uri', d.mqtt_uri);
+    setField('mqtt_user', d.mqtt_user); setField('mqtt_pass', d.mqtt_pass);
+    setField('mqtt_prefix', d.mqtt_prefix); setField('mqtt_interval', d.mqtt_interval);
+    setField('mqtt_qos', d.mqtt_qos); setField('mqtt_ha', d.mqtt_ha);
+    const mqttEn = document.getElementById('mqtt_en');
+    document.getElementById('mqtt-toggle-label').textContent = mqttEn.checked ? 'Enabled' : 'Disabled';
+    document.getElementById('mqtt-fields').classList.toggle('disabled-overlay', !mqttEn.checked);
     updatePreview();
-  } catch(e) {
-    showToast('Failed to load config', 'err');
-  }
+  } catch(e) { showToast('Failed to load config', 'err'); }
 }
-document.getElementById('cfg-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const payload = {
-    ups_name:      document.getElementById('ups_name').value.trim(),
-    ups_desc:      document.getElementById('ups_desc').value.trim(),
-    nut_user:      document.getElementById('nut_user').value.trim(),
-    nut_pass:      document.getElementById('nut_pass').value,
-    nut_port:      parseInt(document.getElementById('nut_port').value) || 3493,
-    poll_ms:       parseInt(document.getElementById('poll_ms').value) || 2000,
-    mqtt_en:       document.getElementById('mqtt_en').checked,
-    mqtt_uri:      document.getElementById('mqtt_uri').value.trim(),
-    mqtt_user:     document.getElementById('mqtt_user').value.trim(),
-    mqtt_pass:     document.getElementById('mqtt_pass').value,
-    mqtt_prefix:   document.getElementById('mqtt_prefix').value.trim(),
+
+function gatherPayload() {
+  return {
+    ups_name: document.getElementById('ups_name').value.trim(),
+    ups_desc: document.getElementById('ups_desc').value.trim(),
+    nut_user: document.getElementById('nut_user').value.trim(),
+    nut_pass: document.getElementById('nut_pass').value,
+    nut_port: parseInt(document.getElementById('nut_port').value) || 3493,
+    poll_ms:  parseInt(document.getElementById('poll_ms').value) || 2000,
+    mqtt_en:  document.getElementById('mqtt_en').checked,
+    mqtt_uri: document.getElementById('mqtt_uri').value.trim(),
+    mqtt_user: document.getElementById('mqtt_user').value.trim(),
+    mqtt_pass: document.getElementById('mqtt_pass').value,
+    mqtt_prefix: document.getElementById('mqtt_prefix').value.trim(),
     mqtt_interval: parseInt(document.getElementById('mqtt_interval').value) || 30,
-    mqtt_qos:      parseInt(document.getElementById('mqtt_qos').value),
-    mqtt_ha:       parseInt(document.getElementById('mqtt_ha').value),
+    mqtt_qos: parseInt(document.getElementById('mqtt_qos').value),
+    mqtt_ha:  parseInt(document.getElementById('mqtt_ha').value),
   };
+}
+
+async function saveConfig(e) {
+  e.preventDefault();
   try {
     const r = await fetch('/api/config', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(gatherPayload()),
     });
     if (!r.ok) throw new Error(r.status);
-    showToast('Saved — settings applied', 'ok');
-  } catch(e) {
-    showToast('Save failed', 'err');
-  }
+    showToast('Saved \u2014 settings applied', 'ok');
+  } catch(e) { showToast('Save failed', 'err'); }
+}
+
+document.getElementById('cfg-form').addEventListener('submit', saveConfig);
+document.getElementById('mqtt-form').addEventListener('submit', saveConfig);
+
+const mqttEn = document.getElementById('mqtt_en');
+mqttEn.addEventListener('change', () => {
+  document.getElementById('mqtt-toggle-label').textContent = mqttEn.checked ? 'Enabled' : 'Disabled';
+  document.getElementById('mqtt-fields').classList.toggle('disabled-overlay', !mqttEn.checked);
 });
+
+/* ── Serial Console ── */
+let logTimer = null;
+async function refreshLog() {
+  try {
+    const r = await fetch('/api/log');
+    const txt = await r.text();
+    const el = document.getElementById('log-output');
+    el.textContent = txt;
+    if (document.getElementById('log-auto').checked)
+      el.scrollTop = el.scrollHeight;
+  } catch(e) {}
+}
+
+function startLogPoll() {
+  if (logTimer) clearInterval(logTimer);
+  logTimer = setInterval(refreshLog, 2000);
+}
+
+/* ── HID dump ── */
+async function refreshHid() {
+  try {
+    const r = await fetch('/api/hid');
+    document.getElementById('hid-output').textContent = await r.text();
+  } catch(e) {}
+}
+
+/* ── OTA ── */
+const otaDrop = document.getElementById('ota-drop');
+const otaFile = document.getElementById('ota-file');
+const otaBtn  = document.getElementById('ota-btn');
+let otaBlob = null;
+
+otaDrop.addEventListener('dragover', e => { e.preventDefault(); otaDrop.classList.add('hover'); });
+otaDrop.addEventListener('dragleave', () => otaDrop.classList.remove('hover'));
+otaDrop.addEventListener('drop', e => {
+  e.preventDefault(); otaDrop.classList.remove('hover');
+  if (e.dataTransfer.files.length) pickFile(e.dataTransfer.files[0]);
+});
+otaFile.addEventListener('change', () => { if (otaFile.files.length) pickFile(otaFile.files[0]); });
+
+function pickFile(f) {
+  if (!f.name.endsWith('.bin')) { showToast('Select a .bin file', 'err'); return; }
+  otaBlob = f;
+  document.getElementById('ota-filename').textContent = f.name + ' (' + (f.size / 1024).toFixed(0) + ' KB)';
+  otaBtn.disabled = false;
+}
+
+function doOta() {
+  if (!otaBlob) return;
+  otaBtn.disabled = true;
+  const prog = document.getElementById('ota-progress');
+  const stat = document.getElementById('ota-status');
+  prog.style.display = 'block'; prog.value = 0;
+  stat.textContent = 'Uploading...'; stat.className = 'ota-status';
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/ota');
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+  xhr.upload.onprogress = e => { if (e.lengthComputable) prog.value = (e.loaded / e.total) * 100; };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      stat.textContent = 'Flashed! Rebooting...'; stat.className = 'ota-status ok';
+      setTimeout(waitReconnect, 3000);
+    } else {
+      stat.textContent = 'Failed: ' + xhr.responseText; stat.className = 'ota-status err';
+      otaBtn.disabled = false;
+    }
+  };
+  xhr.onerror = () => {
+    stat.textContent = 'Upload error'; stat.className = 'ota-status err';
+    otaBtn.disabled = false;
+  };
+  xhr.send(otaBlob);
+}
+
+function waitReconnect() {
+  const stat = document.getElementById('ota-status');
+  stat.textContent = 'Waiting for device...';
+  const iv = setInterval(async () => {
+    try {
+      const r = await fetch('/', {cache:'no-store'});
+      if (r.ok) { clearInterval(iv); stat.textContent = 'Device is back online!'; stat.className = 'ota-status ok'; }
+    } catch(e) {}
+  }, 2000);
+}
+
+/* ── Init ── */
 loadConfig();
-updatePreview();
+startLogPoll();
 </script>
 </body>
 </html>

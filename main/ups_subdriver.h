@@ -21,8 +21,9 @@ typedef struct {
  * Scale function: converts raw HID value + field metadata → NUT string.
  * Standard implementations are in ups_driver.c / declared in ups_driver.h.
  * ----------------------------------------------------------------------- */
+/* physical is the already-scaled value from hid_scale_value() (SI units) */
 typedef void (*ups_scale_fn_t)(char *buf, size_t len,
-                               int32_t val, const hid_field_t *field);
+                               double physical, const hid_field_t *field);
 
 /* -----------------------------------------------------------------------
  * Mapping-table entry flags

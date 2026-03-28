@@ -1,7 +1,12 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
+#include "esp_task_wdt.h"
+#include "esp_netif.h"
 #include "cJSON.h"
 #include "ups_driver.h"
 #include "nvs_config.h"
@@ -16,6 +21,37 @@ extern const char config_html_start[] asm("_binary_config_html_start");
 extern const char config_html_end[]   asm("_binary_config_html_end");
 
 static httpd_handle_t s_server = NULL;
+
+/* ── Log ring buffer for serial console ─────────────────────────────── */
+#define LOG_RING_SIZE  (16 * 1024)
+static char   s_log_ring[LOG_RING_SIZE];
+static size_t s_log_head = 0;   /* next write position */
+static size_t s_log_len  = 0;   /* bytes stored        */
+static vprintf_like_t s_orig_vprintf = NULL;
+static volatile bool  s_log_capture  = false;
+
+/* Minimal log hook: capture into ring buffer, then forward to UART.
+ * Uses a static buffer (not reentrant, but ESP_LOG serializes via lock). */
+static int log_vprintf(const char *fmt, va_list args)
+{
+    static char tmp[256];  /* static — no stack cost */
+    if (s_log_capture) {
+        va_list args_copy;
+        va_copy(args_copy, args);
+        int n = vsnprintf(tmp, sizeof(tmp), fmt, args_copy);
+        va_end(args_copy);
+        if (n > 0) {
+            if (n > (int)sizeof(tmp) - 1) n = sizeof(tmp) - 1;
+            for (int i = 0; i < n; i++) {
+                s_log_ring[s_log_head] = tmp[i];
+                s_log_head = (s_log_head + 1) % LOG_RING_SIZE;
+            }
+            s_log_len += n;
+            if (s_log_len > LOG_RING_SIZE) s_log_len = LOG_RING_SIZE;
+        }
+    }
+    return s_orig_vprintf(fmt, args);
+}
 
 static void field_str(cJSON *obj, const char *key, char *dst, size_t maxlen)
 {
@@ -39,8 +75,16 @@ static esp_err_t handle_config_page(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_send(req, config_html_start,
-                    (ssize_t)(config_html_end - config_html_start - 1));
+    /* Send in chunks to avoid large stack allocation in httpd_resp_send */
+    const char *p = config_html_start;
+    size_t remaining = config_html_end - config_html_start - 1;
+    while (remaining > 0) {
+        size_t chunk = remaining > 4096 ? 4096 : remaining;
+        if (httpd_resp_send_chunk(req, p, chunk) != ESP_OK) return ESP_FAIL;
+        p += chunk;
+        remaining -= chunk;
+    }
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -58,7 +102,7 @@ static esp_err_t handle_api_status(httpd_req_t *req)
     cJSON_AddStringToObject(root, "ups.model",              d.model);
     cJSON_AddStringToObject(root, "ups.firmware",           d.firmware);
     cJSON_AddStringToObject(root, "device.serial",          d.serial);
-    cJSON_AddStringToObject(root, "ups.test.result",        d.test_result);
+    cJSON_AddStringToObject(root, "ups.test.result",        d.ups_test_result);
 
     char buf[32];
 #define ADDF(key, fmt, val) do { snprintf(buf, sizeof(buf), fmt, val); \
@@ -69,11 +113,26 @@ static esp_err_t handle_api_status(httpd_req_t *req)
     ADDF("battery.voltage",         "%.2f", d.battery_voltage);
     ADDF("battery.charge.low",      "%.1f", d.battery_charge_low);
     ADDF("battery.charge.warning",  "%.1f", d.battery_charge_warning);
+    ADDF("battery.temperature",     "%.1f", d.battery_temperature);
     ADDF("input.voltage",           "%.1f", d.input_voltage);
     ADDF("ups.load",                "%.1f", d.ups_load);
     ADDF("ups.temperature",         "%.1f", d.ups_temperature);
     ADDF("ups.realpower.nominal",   "%.0f", d.ups_realpower_nominal);
+    ADDF("ups.realpower",           "%.0f", d.ups_realpower);
 #undef ADDF
+
+    /* USB debug fields */
+    {
+        uint16_t vid, pid; bool ever_seen;
+        ups_driver_get_last_usb(&vid, &pid, &ever_seen);
+        cJSON_AddBoolToObject(root, "_usb_connected", ups_driver_is_connected());
+        cJSON_AddBoolToObject(root, "_usb_ever_seen", ever_seen);
+        if (ever_seen) {
+            char vidpid[12];
+            snprintf(vidpid, sizeof(vidpid), "%04x:%04x", vid, pid);
+            cJSON_AddStringToObject(root, "_usb_vidpid", vidpid);
+        }
+    }
 
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -167,6 +226,196 @@ static esp_err_t handle_api_config_post(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ── GET /api/log — return log ring buffer as plain text ─────────────── */
+static esp_err_t handle_api_log(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+    if (s_log_len == 0) {
+        httpd_resp_sendstr(req, "(no log output yet)\n");
+        return ESP_OK;
+    }
+
+    size_t start;
+    size_t len = s_log_len;
+    if (len >= LOG_RING_SIZE) {
+        len = LOG_RING_SIZE;
+        start = s_log_head;  /* oldest byte */
+    } else {
+        start = (s_log_head + LOG_RING_SIZE - len) % LOG_RING_SIZE;
+    }
+
+    /* Send in up to 2 chunks (ring may wrap) */
+    if (start + len <= LOG_RING_SIZE) {
+        httpd_resp_send(req, &s_log_ring[start], len);
+    } else {
+        size_t first = LOG_RING_SIZE - start;
+        httpd_resp_send_chunk(req, &s_log_ring[start], first);
+        httpd_resp_send_chunk(req, &s_log_ring[0], len - first);
+        httpd_resp_send_chunk(req, NULL, 0);
+    }
+    return ESP_OK;
+}
+
+/* ── Deferred restart task — clean shutdown outside httpd context ──── */
+static void ota_restart_task(void *arg)
+{
+    /* Give httpd time to finish sending the "OK" response */
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    ESP_LOGW(TAG, "OTA: stopping all services before restart...");
+
+    /* Disable log capture first so shutdown logs don't contend */
+    s_log_capture = false;
+    if (s_orig_vprintf) {
+        esp_log_set_vprintf(s_orig_vprintf);
+        s_orig_vprintf = NULL;
+    }
+
+    /* Stop httpd — this closes the listening socket AND the internal
+     * UDP control socket, preventing stale socket state after reboot */
+    if (s_server) {
+        httpd_stop(s_server);
+        s_server = NULL;
+    }
+
+    /* Stop other network services */
+    extern void nut_server_stop(void);
+    extern void mqtt_pub_stop(void);
+    nut_server_stop();
+    mqtt_pub_stop();
+
+    /* Let lwIP finish closing all sockets */
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    ESP_LOGW(TAG, "OTA: restarting now");
+    esp_restart();
+    vTaskDelete(NULL);  /* never reached */
+}
+
+/* ── POST /api/ota ───────────────────────────────────────────────────── */
+static esp_err_t handle_ota(httpd_req_t *req)
+{
+    esp_ota_handle_t ota_handle = 0;
+    const esp_partition_t *update_part = esp_ota_get_next_update_partition(NULL);
+
+    if (!update_part) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition");
+        return ESP_FAIL;
+    }
+
+    int content_len = req->content_len;
+    ESP_LOGI(TAG, "OTA: content_len=%d → %s (0x%lx)",
+             content_len, update_part->label, (unsigned long)update_part->address);
+    if (content_len <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No content length");
+        return ESP_FAIL;
+    }
+
+    esp_task_wdt_reset();
+
+    char *buf = malloc(8192);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_FAIL;
+    }
+
+    esp_err_t err = esp_ota_begin(update_part, content_len, &ota_handle);
+    if (err != ESP_OK) {
+        free(buf);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA begin failed");
+        return ESP_FAIL;
+    }
+
+    int remaining = content_len;
+    int total_written = 0;
+    bool ok = true;
+    while (remaining > 0) {
+        int to_read = remaining < 8192 ? remaining : 8192;
+        int received = httpd_req_recv(req, buf, to_read);
+        if (received <= 0) {
+            ESP_LOGE(TAG, "OTA recv error at %d/%d (ret=%d)", total_written, content_len, received);
+            ok = false;
+            break;
+        }
+        if (esp_ota_write(ota_handle, buf, received) != ESP_OK) {
+            ESP_LOGE(TAG, "OTA write error at %d", total_written);
+            ok = false;
+            break;
+        }
+        total_written += received;
+        remaining -= received;
+    }
+    free(buf);
+
+    if (!ok) {
+        esp_ota_abort(ota_handle);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA failed");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "OTA: wrote %d bytes, validating...", total_written);
+    err = esp_ota_end(ota_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "OTA validation failed: %s", esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA validation failed");
+        return ESP_FAIL;
+    }
+    err = esp_ota_set_boot_partition(update_part);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Set boot partition failed: %s", esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Set boot failed");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "OTA success — restarting via clean shutdown task");
+    httpd_resp_sendstr(req, "OK");
+
+    /* Spawn a separate task to do the restart — NOT from httpd handler context.
+     * This ensures httpd can finish sending the response and we can cleanly
+     * tear down all sockets before esp_restart(). */
+    xTaskCreate(ota_restart_task, "ota_restart", 4096, NULL, 5, NULL);
+    return ESP_OK;
+}
+
+/* ── GET /api/hid — dump parsed HID report map as plain text ─────────── */
+static esp_err_t handle_api_hid(httpd_req_t *req)
+{
+    const hid_report_map_t *map = ups_driver_get_report_map();
+    static const char *type_name[] = { "INPUT", "OUTPUT", "FEATURE" };
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+    char line[256];
+    snprintf(line, sizeof(line), "HID Report Map: %u fields\n\n", map->count);
+    httpd_resp_sendstr_chunk(req, line);
+
+    for (uint8_t i = 0; i < map->count; i++) {
+        const hid_field_t *f = &map->fields[i];
+        int n = snprintf(line, sizeof(line),
+            "[%3u] %-7s rid=0x%02x usage=0x%08lx bit_off=%3u bit_sz=%u "
+            "lmin=%ld lmax=%ld pmin=%ld pmax=%ld unit=0x%08lx uexp=%d coll=%u[",
+            i, type_name[f->item_type], f->report_id,
+            (unsigned long)f->usage, f->bit_offset, f->bit_size,
+            (long)f->logical_min, (long)f->logical_max,
+            (long)f->phy_min, (long)f->phy_max,
+            (unsigned long)f->unit, (int)f->unit_exp,
+            f->collection_depth);
+        for (uint8_t d = 0; d < f->collection_depth && n < (int)sizeof(line) - 16; d++)
+            n += snprintf(line + n, sizeof(line) - n, "%s0x%08lx",
+                          d ? "," : "", (unsigned long)f->collection_path[d]);
+        n += snprintf(line + n, sizeof(line) - n, "]\n");
+        (void)n;
+        httpd_resp_sendstr_chunk(req, line);
+    }
+
+    httpd_resp_sendstr_chunk(req, NULL);  /* end chunked response */
+    return ESP_OK;
+}
+
 /* ── router ──────────────────────────────────────────────────────────── */
 static const httpd_uri_t s_routes[] = {
     { .uri="/",           .method=HTTP_GET,  .handler=handle_index           },
@@ -174,18 +423,31 @@ static const httpd_uri_t s_routes[] = {
     { .uri="/api/status", .method=HTTP_GET,  .handler=handle_api_status      },
     { .uri="/api/config", .method=HTTP_GET,  .handler=handle_api_config_get  },
     { .uri="/api/config", .method=HTTP_POST, .handler=handle_api_config_post },
+    { .uri="/api/hid",    .method=HTTP_GET,  .handler=handle_api_hid        },
+    { .uri="/api/log",    .method=HTTP_GET,  .handler=handle_api_log        },
+    { .uri="/api/ota",    .method=HTTP_POST, .handler=handle_ota,
+      .user_ctx=NULL },
 };
 
 esp_err_t web_server_start(void)
 {
+    esp_log_level_set("httpd", ESP_LOG_DEBUG);
+    esp_log_level_set("httpd_txrx", ESP_LOG_DEBUG);
+
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port      = 80;
-    cfg.max_uri_handlers = 8;
-    cfg.stack_size       = 8192;
+    cfg.max_uri_handlers = 12;
+    cfg.stack_size       = 16384;
+    cfg.lru_purge_enable = true;
+    cfg.ctrl_port        = 32769;  /* avoid potential bind conflict after OTA reboot */
 
     ESP_ERROR_CHECK(httpd_start(&s_server, &cfg));
     for (int i = 0; i < (int)(sizeof(s_routes)/sizeof(s_routes[0])); i++)
         httpd_register_uri_handler(s_server, &s_routes[i]);
+
+    /* Hook ESP_LOG into ring buffer AFTER server is fully started */
+    s_orig_vprintf = esp_log_set_vprintf(log_vprintf);
+    s_log_capture = true;
 
     ESP_LOGI(TAG, "HTTP server on port 80");
     return ESP_OK;

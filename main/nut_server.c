@@ -1,5 +1,6 @@
 #include "nut_server.h"
 #include "ups_driver.h"
+#include "nvs_config.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -13,10 +14,12 @@
 
 static const char *TAG = "nut_server";
 
-#define MAX_CLIENTS  4
+#define MAX_CLIENTS  8
 #define RX_BUF_SIZE  256
 #define TX_BUF_SIZE  1024
-#define UPS_NAME     "ups"
+
+/* Returns the configured UPS name (from NVS, e.g. "RD-UPS01"). */
+static const char *nut_ups_name(void) { return nvs_config_get()->ups_name; }
 
 typedef struct {
     int  fd;
@@ -37,26 +40,43 @@ static void client_sendf(int fd, const char *fmt, ...)
     send(fd, buf, strlen(buf), 0);
 }
 
+static const char *ups_description(void)
+{
+    const char *desc = nvs_config_get()->ups_desc;
+    if (desc && desc[0]) return desc;
+    /* Fallback: "Manufacturer Model" from HID device info */
+    static char buf[96];
+    const char *mfr   = ups_driver_get_var("device.mfr");
+    const char *model = ups_driver_get_var("device.model");
+    if (mfr && model)
+        snprintf(buf, sizeof(buf), "%s %s", mfr, model);
+    else if (model)
+        snprintf(buf, sizeof(buf), "%s", model);
+    else
+        snprintf(buf, sizeof(buf), "UPS");
+    return buf;
+}
+
 static void handle_list_ups(int fd)
 {
     client_sendf(fd,
         "BEGIN LIST UPS\n"
-        "UPS " UPS_NAME " \"%s\"\n"
+        "UPS %s \"%s\"\n"
         "END LIST UPS\n",
-        ups_driver_get_ups_name());
+        nut_ups_name(), ups_description());
 }
 
 static void handle_list_var(int fd, const char *ups_name)
 {
-    if (strcmp(ups_name, UPS_NAME) != 0) {
+    if (strcmp(ups_name, nut_ups_name()) != 0) {
         client_sendf(fd, "ERR UNKNOWN-UPS\n");
         return;
     }
     char buf[TX_BUF_SIZE];
-    client_sendf(fd, "BEGIN LIST VAR " UPS_NAME "\n");
+    client_sendf(fd, "BEGIN LIST VAR %s\n", nut_ups_name());
     ups_driver_list_vars(buf, sizeof(buf));
     send(fd, buf, strlen(buf), 0);
-    client_sendf(fd, "END LIST VAR " UPS_NAME "\n");
+    client_sendf(fd, "END LIST VAR %s\n", nut_ups_name());
 }
 
 static void process_line(nut_client_t *client, char *line)
@@ -76,21 +96,22 @@ static void process_line(nut_client_t *client, char *line)
     if (ntok == 0) return;
 
     const char *cmd = tokens[0];
+    const char *uname = nut_ups_name();
 
     if (strcasecmp(cmd, "USERNAME") == 0) {
         if (ntok < 2) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
-        client->username_ok = (strcmp(tokens[1], CONFIG_APC_NUT_USERNAME) == 0);
+        client->username_ok = (strcmp(tokens[1], nvs_config_get()->nut_user) == 0);
         client_sendf(fd, client->username_ok ? "OK\n" : "ERR ACCESS-DENIED\n");
 
     } else if (strcasecmp(cmd, "PASSWORD") == 0) {
         if (ntok < 2) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
         bool ok = client->username_ok &&
-                  strcmp(tokens[1], CONFIG_APC_NUT_PASSWORD) == 0;
+                  strcmp(tokens[1], nvs_config_get()->nut_pass) == 0;
         client_sendf(fd, ok ? "OK\n" : "ERR ACCESS-DENIED\n");
 
     } else if (strcasecmp(cmd, "LOGIN") == 0) {
         if (ntok < 2) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
-        if (strcmp(tokens[1], UPS_NAME) != 0) {
+        if (strcmp(tokens[1], uname) != 0) {
             client_sendf(fd, "ERR UNKNOWN-UPS\n"); return;
         }
         client->logged_in = true;
@@ -108,8 +129,11 @@ static void process_line(nut_client_t *client, char *line)
         } else if (strcasecmp(tokens[1], "VAR") == 0) {
             if (ntok < 3) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
             handle_list_var(fd, tokens[2]);
-        } else if (strcasecmp(tokens[1], "CMD") == 0 ||
-                   strcasecmp(tokens[1], "RW")  == 0) {
+        } else if (strcasecmp(tokens[1], "CMD")    == 0 ||
+                   strcasecmp(tokens[1], "RW")     == 0 ||
+                   strcasecmp(tokens[1], "CLIENT")  == 0 ||
+                   strcasecmp(tokens[1], "ENUM")    == 0 ||
+                   strcasecmp(tokens[1], "RANGE")   == 0) {
             if (ntok < 3) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
             client_sendf(fd, "BEGIN LIST %s %s\nEND LIST %s %s\n",
                          tokens[1], tokens[2], tokens[1], tokens[2]);
@@ -121,25 +145,25 @@ static void process_line(nut_client_t *client, char *line)
         if (ntok < 2) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
         if (strcasecmp(tokens[1], "VAR") == 0) {
             if (ntok < 4) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
-            if (strcmp(tokens[2], UPS_NAME) != 0) {
+            if (strcmp(tokens[2], uname) != 0) {
                 client_sendf(fd, "ERR UNKNOWN-UPS\n"); return;
             }
             const char *val = ups_driver_get_var(tokens[3]);
             if (!val) { client_sendf(fd, "ERR VAR-NOT-SUPPORTED\n"); return; }
-            client_sendf(fd, "VAR " UPS_NAME " %s \"%s\"\n", tokens[3], val);
+            client_sendf(fd, "VAR %s %s \"%s\"\n", uname, tokens[3], val);
 
         } else if (strcasecmp(tokens[1], "TYPE") == 0) {
             if (ntok < 4) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
-            if (strcmp(tokens[2], UPS_NAME) != 0) {
+            if (strcmp(tokens[2], uname) != 0) {
                 client_sendf(fd, "ERR UNKNOWN-UPS\n"); return;
             }
             const char *val = ups_driver_get_var(tokens[3]);
             if (!val) { client_sendf(fd, "ERR VAR-NOT-SUPPORTED\n"); return; }
-            client_sendf(fd, "TYPE " UPS_NAME " %s STRING:64\n", tokens[3]);
+            client_sendf(fd, "TYPE %s %s STRING:64\n", uname, tokens[3]);
 
         } else if (strcasecmp(tokens[1], "DESC") == 0) {
             if (ntok < 4) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
-            client_sendf(fd, "DESC " UPS_NAME " %s \"%s\"\n", tokens[3], tokens[3]);
+            client_sendf(fd, "DESC %s %s \"%s\"\n", uname, tokens[3], tokens[3]);
 
         } else if (strcasecmp(tokens[1], "NUMLOGINS") == 0) {
             if (ntok < 3) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
@@ -150,7 +174,7 @@ static void process_line(nut_client_t *client, char *line)
 
         } else if (strcasecmp(tokens[1], "UPSDESC") == 0) {
             if (ntok < 3) { client_sendf(fd, "ERR MISSING-ARGUMENT\n"); return; }
-            client_sendf(fd, "UPSDESC %s \"APC Back-UPS\"\n", tokens[2]);
+            client_sendf(fd, "UPSDESC %s \"%s\"\n", tokens[2], ups_description());
 
         } else {
             client_sendf(fd, "ERR INVALID-ARGUMENT\n");
@@ -159,7 +183,7 @@ static void process_line(nut_client_t *client, char *line)
     } else if (strcasecmp(cmd, "VER") == 0) {
         client_sendf(fd, "esp32-apc-nut-server 1.0.0\n");
     } else if (strcasecmp(cmd, "NETVER") == 0) {
-        client_sendf(fd, "1.2\n");
+        client_sendf(fd, "1.3\n");
     } else if (strcasecmp(cmd, "HELP") == 0) {
         client_sendf(fd, "Commands: USERNAME PASSWORD LOGIN LOGOUT LIST GET VER NETVER HELP\n");
     } else {
@@ -207,7 +231,7 @@ void nut_server_task(void *arg)
 
     struct sockaddr_in addr = {
         .sin_family      = AF_INET,
-        .sin_port        = htons(CONFIG_APC_NUT_PORT),
+        .sin_port        = htons(nvs_config_get()->nut_port),
         .sin_addr.s_addr = htonl(INADDR_ANY),
     };
 
@@ -222,7 +246,8 @@ void nut_server_task(void *arg)
     }
 
     fcntl(listen_fd, F_SETFL, fcntl(listen_fd, F_GETFL, 0) | O_NONBLOCK);
-    ESP_LOGI(TAG, "NUT server listening on port %d", CONFIG_APC_NUT_PORT);
+    ESP_LOGI(TAG, "NUT server listening on port %d as \"%s\"",
+             nvs_config_get()->nut_port, nut_ups_name());
 
     char rx_buf[RX_BUF_SIZE];
     char line_buf[MAX_CLIENTS][RX_BUF_SIZE];

@@ -45,7 +45,7 @@ a{color:inherit;text-decoration:none}
 .section-label{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--base-content-muted);margin-bottom:1rem;opacity:.7}
 .card{background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:1.5rem}
 .card-title{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--base-content-muted);margin-bottom:1.25rem;opacity:.7}
-.donut-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.donut-grid{display:grid;gap:1rem;grid-template-columns:repeat(6,1fr)}
 .donut-card{display:flex;flex-direction:column;align-items:center;gap:.75rem}
 .donut-wrap{position:relative;width:150px;height:150px}
 .donut-wrap svg{transform:rotate(-90deg)}
@@ -62,12 +62,8 @@ a{color:inherit;text-decoration:none}
 .divider{height:1px;background:var(--border-color);margin:1.75rem 0}
 footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:flex;justify-content:space-between;align-items:center;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color)}
 .mono{font-family:var(--font-mono)}
+@media(max-width:960px){.donut-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.page{padding:1.25rem 1rem}.navbar-center{display:none}.donut-grid{grid-template-columns:repeat(2,1fr)}}
-.info-badges{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem}
-.info-badge{flex:1;display:flex;align-items:center;justify-content:center;gap:.5rem;background:var(--base-100);border:1px solid var(--border-color);border-radius:var(--radius-box);padding:.5rem 1rem;font-size:.85rem}
-.info-badge svg{opacity:.6;flex-shrink:0}
-.info-badge-label{color:var(--base-content-muted);font-size:.75rem}
-.info-badge-value{font-family:var(--font-mono);font-weight:600;color:var(--base-content);margin-left:.25rem}
 </style>
 </head>
 <body>
@@ -96,6 +92,16 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
   <p class="section-label">Power Status</p>
   <div class="donut-grid">
     <div class="donut-card">
+      <div class="card-title">Battery Runtime</div>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 150 150" width="150" height="150">
+          <circle class="donut-bg" cx="75" cy="75" r="60"/>
+          <circle class="donut-fg" id="d-runtime" cx="75" cy="75" r="60" stroke="#a78bfa" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="donut-center"><span class="donut-pct" id="v-runtime" style="font-size:1.1rem">--</span><span class="donut-sublabel">min</span></div>
+      </div>
+    </div>
+    <div class="donut-card">
       <div class="card-title">UPS Load</div>
       <div class="donut-wrap">
         <svg viewBox="0 0 150 150" width="150" height="150">
@@ -113,6 +119,16 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
           <circle class="donut-fg" id="d-charge" cx="75" cy="75" r="60" stroke="#6366f1" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
         </svg>
         <div class="donut-center"><span class="donut-pct" id="v-charge">--</span><span class="donut-sublabel">%</span></div>
+      </div>
+    </div>
+    <div class="donut-card">
+      <div class="card-title">UPS Power</div>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 150 150" width="150" height="150">
+          <circle class="donut-bg" cx="75" cy="75" r="60"/>
+          <circle class="donut-fg" id="d-power" cx="75" cy="75" r="60" stroke="#f472b6" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="donut-center"><span class="donut-pct" id="v-power-badge" style="font-size:1.25rem">--</span><span class="donut-sublabel">W</span></div>
       </div>
     </div>
     <div class="donut-card">
@@ -137,19 +153,6 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
     </div>
   </div>
 
-  <div class="info-badges">
-    <div class="info-badge">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span class="info-badge-label">Battery Runtime</span>
-      <span class="info-badge-value" id="v-runtime">--</span>
-    </div>
-    <div class="info-badge">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      <span class="info-badge-label">UPS Power</span>
-      <span class="info-badge-value" id="v-power-badge">--</span>
-    </div>
-  </div>
-
   <div class="divider"></div>
 
   <div class="stats-grid">
@@ -157,6 +160,7 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
       <div class="card-title">Runtime Details</div>
       <div class="stat-row"><span class="stat-key">Est. runtime remaining</span><span class="stat-val" id="v-runtime-detail">--</span></div>
       <div class="stat-row"><span class="stat-key">Battery voltage</span><span class="stat-val" id="v-batvolt">--</span></div>
+      <div class="stat-row"><span class="stat-key">Battery temperature</span><span class="stat-val" id="v-battemp">--</span></div>
       <div class="stat-row"><span class="stat-key">Charge low threshold</span><span class="stat-val" id="v-batlow">--</span></div>
       <div class="stat-row"><span class="stat-key">Charge warning threshold</span><span class="stat-val" id="v-batwarn">--</span></div>
       <div class="stat-row"><span class="stat-key">Last self-test result</span><span class="stat-val" id="v-test">--</span></div>
@@ -212,15 +216,23 @@ async function refresh() {
     const charge = parseFloat(d['battery.charge']) || 0;
     const load   = parseFloat(d['ups.load']) || 0;
     const volt   = parseFloat(d['input.voltage']) || 0;
-    const temp   = parseFloat(d['ups.temperature']) || 0;
+    const temp   = parseFloat(d['ups.temperature']) || parseFloat(d['battery.temperature']) || 0;
     setDonut('charge', charge); setText('charge', charge.toFixed(0));
     setDonut('load', load);     setText('load', load.toFixed(0));
     setDonut('volt', Math.min(100, (volt / 260) * 100)); setText('volt', volt.toFixed(0));
     setDonut('temp', Math.min(100, (temp / 60) * 100));  setText('temp', temp.toFixed(1));
-    setText('runtime', fmtRuntime(parseInt(d['battery.runtime'])));
+    const rtSecs = parseInt(d['battery.runtime']) || 0;
+    const rtMins = Math.floor(rtSecs / 60);
+    setText('runtime', rtMins > 0 ? rtMins : '--');
+    setDonut('runtime', Math.min(100, (rtSecs / 3600) * 100));
+    const power = parseFloat(d['ups.realpower']) || 0;
+    const nominal = parseFloat(d['ups.realpower.nominal']) || 1;
+    setText('power-badge', power > 0 ? power.toFixed(0) : '--');
+    setDonut('power', Math.min(100, (power / nominal) * 100));
     const rtDetail = document.getElementById('v-runtime-detail');
-    if (rtDetail) rtDetail.textContent = fmtRuntime(parseInt(d['battery.runtime']));
+    if (rtDetail) rtDetail.textContent = fmtRuntime(rtSecs);
     setText('batvolt', d['battery.voltage'] ? d['battery.voltage'] + ' V' : '--');
+    setText('battemp', d['battery.temperature'] && d['battery.temperature'] !== '0.0' ? d['battery.temperature'] + ' °C' : '--');
     setText('batlow',  d['battery.charge.low'] ? d['battery.charge.low'] + ' %' : '--');
     setText('batwarn', d['battery.charge.warning'] ? d['battery.charge.warning'] + ' %' : '--');
     setText('test',    d['ups.test.result'] || '--');
@@ -229,8 +241,6 @@ async function refresh() {
     setText('fw',      d['ups.firmware'] || '--');
     setText('serial',  d['device.serial'] || '--');
     setText('power',   d['ups.realpower.nominal'] ? d['ups.realpower.nominal'] + ' W' : '--');
-    const powerBadge = document.getElementById('v-power-badge');
-    if (powerBadge) powerBadge.textContent = d['ups.realpower.nominal'] ? d['ups.realpower.nominal'] + ' W' : '--';
     applyStatus(d['ups.status']);
     document.getElementById('ups-name').textContent = d['_ups_name'] || 'apc';
     document.getElementById('last-update').textContent = new Date().toLocaleTimeString();

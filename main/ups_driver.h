@@ -44,6 +44,7 @@ typedef struct {
     float   ups_load;
     float   ups_temperature;
     float   ups_realpower_nominal;
+    float   ups_realpower;
     int32_t ups_delay_start;
     int32_t ups_delay_shutdown;
     char    ups_beeper_status[16];
@@ -55,11 +56,12 @@ typedef struct {
  * Declared here so subdriver mapping tables (in *_subdriver.c) can
  * reference them without duplicating the implementations.
  * ----------------------------------------------------------------------- */
-void ups_scale_voltage    (char *buf, size_t len, int32_t val, const hid_field_t *f);
-void ups_scale_current    (char *buf, size_t len, int32_t val, const hid_field_t *f);
-void ups_scale_temperature(char *buf, size_t len, int32_t val, const hid_field_t *f);
-void ups_scale_frequency  (char *buf, size_t len, int32_t val, const hid_field_t *f);
-void ups_scale_mfr_date   (char *buf, size_t len, int32_t val, const hid_field_t *f);
+/* physical = output of hid_scale_value() — SI units, properly scaled */
+void ups_scale_voltage    (char *buf, size_t len, double physical, const hid_field_t *f);
+void ups_scale_current    (char *buf, size_t len, double physical, const hid_field_t *f);
+void ups_scale_temperature(char *buf, size_t len, double physical, const hid_field_t *f);
+void ups_scale_frequency  (char *buf, size_t len, double physical, const hid_field_t *f);
+void ups_scale_mfr_date   (char *buf, size_t len, double physical, const hid_field_t *f);
 
 /* -----------------------------------------------------------------------
  * Driver public API
@@ -82,3 +84,5 @@ void        ups_driver_get_data(ups_data_t *out);
 /* Convenience queries. */
 bool        ups_driver_is_connected(void);
 const char *ups_driver_get_ups_name(void);  /* Returns model string for NUT LIST UPS */
+void        ups_driver_get_last_usb(uint16_t *vid, uint16_t *pid, bool *ever_seen);
+const hid_report_map_t *ups_driver_get_report_map(void);

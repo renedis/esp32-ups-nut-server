@@ -7,6 +7,7 @@
 #include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include "esp_ota_ops.h"
 #include "nvs_flash.h"
 #include "usb/usb_host.h"
 #include "riello_usb.h"
@@ -110,6 +111,7 @@ static esp_err_t network_init(void)
 #define ETH_MDIO        52
 #define ETH_PHY_PWR     51
 #define ETH_PHY_ADDR     1
+#define USB_VBUS_EN     45  /* P-ch MOSFET Q1 gate — drive LOW to enable 5V VBUS on USB-A */
 
 static void eth_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
@@ -188,6 +190,9 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "APC NUT Server starting");
 
+    /* Mark this OTA partition as valid so the bootloader doesn't roll back */
+    esp_ota_mark_app_valid_cancel_rollback();
+
     esp_task_wdt_config_t wdt_cfg = {
         .timeout_ms     = 30000,
         .idle_core_mask = 0,
@@ -217,6 +222,18 @@ void app_main(void)
 
     if (network_init() != ESP_OK)
         ESP_LOGW(TAG, "Network unavailable — services will start anyway");
+
+#ifdef CONFIG_APC_NUT_BOARD_ESP32P4_ETH
+    /* Enable 5V VBUS on USB-A port: GPIO45 drives P-ch MOSFET Q1, active LOW */
+    gpio_config_t vbus_cfg = {
+        .pin_bit_mask = BIT64(USB_VBUS_EN),
+        .mode         = GPIO_MODE_OUTPUT,
+    };
+    ESP_ERROR_CHECK(gpio_config(&vbus_cfg));
+    gpio_set_level(USB_VBUS_EN, 0);
+    vTaskDelay(pdMS_TO_TICKS(100));  /* let VBUS stabilise before host init */
+    ESP_LOGI(TAG, "USB VBUS enabled (GPIO%d low)", USB_VBUS_EN);
+#endif
 
     usb_host_config_t host_cfg = {
         .skip_phy_setup = false,

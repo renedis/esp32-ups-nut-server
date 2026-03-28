@@ -221,7 +221,7 @@ static esp_err_t cypress_init(void)
     s_xfer_out->callback  = xfer_cb;
     s_xfer_out->context   = NULL;
 
-    esp_err_t ret = usb_host_transfer_submit_control(s_dev, s_xfer_out);
+    esp_err_t ret = usb_host_transfer_submit_control(s_client, s_xfer_out);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "cypress_init submit: %s", esp_err_to_name(ret));
         return ret;
@@ -474,7 +474,7 @@ static void riello_disconnect(void)
 static void client_event_cb(const usb_host_client_event_msg_t *msg, void *arg)
 {
     if (msg->event == USB_HOST_CLIENT_EVENT_NEW_DEV) {
-        s_pending_addr    = msg->new_dev.dev_addr;
+        s_pending_addr    = msg->new_dev.address;
         s_pending_connect = true;
     } else if (msg->event == USB_HOST_CLIENT_EVENT_DEV_GONE) {
         if (s_connected && msg->dev_gone.dev_hdl == s_dev)

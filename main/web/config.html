@@ -102,6 +102,13 @@ progress::-webkit-progress-value{background:#89b4fa;border-radius:4px;transition
 .ovr-table input{width:100%;background:var(--base-200);border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.35rem .6rem;font-size:.8rem;color:var(--base-content);font-family:var(--font-mono);outline:none;transition:border-color .15s}
 .ovr-table input:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
 .ovr-table input.has-override{border-color:rgba(250,204,21,.4);background:rgba(250,204,21,.05)}
+.navbar-end{display:flex;align-items:center;gap:.75rem}
+.badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .7rem;border-radius:999px;border:1px solid}
+.badge-success{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.3);color:#4ade80}
+.badge-warning{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);color:#fbbf24}
+.badge-error{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:#f87171}
+.badge-neutral{background:rgba(255,255,255,.06);border-color:var(--border-color);color:var(--base-content-muted)}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
 footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color)}
 </style>
 </head>
@@ -122,7 +129,9 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
       Settings
     </a>
   </div>
-  <div></div>
+  <div class="navbar-end">
+    <span class="badge badge-neutral" id="status-badge"><span class="dot"></span><span id="status-text">Connecting</span></span>
+  </div>
 </nav>
 
 <div class="layout">
@@ -701,9 +710,30 @@ async function saveOverrides() {
   } catch(e) { showToast('Failed to save overrides', 'err'); }
 }
 
+/* ── Status badge ── */
+function applyStatus(s) {
+  const badge = document.getElementById('status-badge');
+  const txt = document.getElementById('status-text');
+  badge.className = 'badge';
+  if (!s) { badge.classList.add('badge-neutral'); txt.textContent = 'Unknown'; return; }
+  if (s.includes('LB')) { badge.classList.add('badge-error'); txt.textContent = 'Low Battery'; }
+  else if (s.includes('OB')) { badge.classList.add('badge-warning'); txt.textContent = 'On Battery'; }
+  else if (s.includes('OL')) { badge.classList.add('badge-success'); txt.textContent = 'On Line'; }
+  else { badge.classList.add('badge-neutral'); txt.textContent = s; }
+  if (s.includes('CHRG')) txt.textContent += ' \u00B7 Charging';
+}
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/status');
+    if (r.ok) { const d = await r.json(); applyStatus(d['ups.status']); }
+  } catch(e) {}
+}
+setInterval(refreshStatus, 5000);
+
 /* ── Init ── */
 loadConfig();
 startLogPoll();
+refreshStatus();
 </script>
 </body>
 </html>

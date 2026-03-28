@@ -52,8 +52,8 @@ a{color:inherit;text-decoration:none}
 .donut-bg{fill:none;stroke:rgba(255,255,255,.07);stroke-width:10}
 .donut-fg{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.4,0,.2,1),stroke .4s}
 .donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.donut-pct{font-size:1.6rem;font-weight:700;letter-spacing:-.03em;font-family:var(--font-mono)}
-.donut-sublabel{font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--base-content-muted);margin-top:.1rem;opacity:.7}
+.donut-pct{font-size:1.15rem;font-weight:700;letter-spacing:-.03em;font-family:var(--font-mono)}
+.donut-sublabel{font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--base-content-muted);margin-top:.1rem;opacity:.7;margin-left:.25rem}
 .stats-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:1rem}
 .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:.55rem 0;border-bottom:1px solid var(--border-color)}
 .stat-row:last-child{border-bottom:none}
@@ -98,7 +98,7 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
           <circle class="donut-bg" cx="75" cy="75" r="60"/>
           <circle class="donut-fg" id="d-runtime" cx="75" cy="75" r="60" stroke="#a78bfa" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
         </svg>
-        <div class="donut-center"><span class="donut-pct" id="v-runtime" style="font-size:.85rem">--</span></div>
+        <div class="donut-center"><span class="donut-pct" id="v-runtime">--</span></div>
       </div>
     </div>
     <div class="donut-card">
@@ -128,7 +128,7 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
           <circle class="donut-bg" cx="75" cy="75" r="60"/>
           <circle class="donut-fg" id="d-power" cx="75" cy="75" r="60" stroke="#f472b6" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
         </svg>
-        <div class="donut-center"><span class="donut-pct" id="v-power-badge" style="font-size:1.25rem">--</span><span class="donut-sublabel">W</span></div>
+        <div class="donut-center"><span class="donut-pct" id="v-power-badge">--</span><span class="donut-sublabel">W</span></div>
       </div>
     </div>
     <div class="donut-card">
@@ -138,7 +138,7 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
           <circle class="donut-bg" cx="75" cy="75" r="60"/>
           <circle class="donut-fg" id="d-volt" cx="75" cy="75" r="60" stroke="#38bdf8" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
         </svg>
-        <div class="donut-center"><span class="donut-pct" id="v-volt" style="font-size:1.25rem">--</span><span class="donut-sublabel">VAC</span></div>
+        <div class="donut-center"><span class="donut-pct" id="v-volt">--</span><span class="donut-sublabel">VAC</span></div>
       </div>
     </div>
     <div class="donut-card">

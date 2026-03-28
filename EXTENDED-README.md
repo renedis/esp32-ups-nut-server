@@ -1,4 +1,4 @@
-# ESP32 APC NUT Server — Extended Documentation
+# ESP32 UPS NUT Server — Extended Documentation
 
 ## Overview
 
@@ -110,8 +110,8 @@ The following variables are reported depending on what the connected UPS support
 ### Build Steps
 
 ```bash
-git clone https://github.com/renedis/esp32-apc-nut-server.git
-cd esp32-apc-nut-server
+git clone https://github.com/renedis/esp32-ups-nut-server.git
+cd esp32-ups-nut-server
 
 source ~/esp/esp-idf/export.sh
 idf.py build
@@ -180,7 +180,7 @@ The Overrides tab shows all NUT variables with their live values and lets you ov
 
 1. Build new firmware with `idf.py build`
 2. Open `http://<ip>/config` and go to the **Firmware OTA** tab
-3. Select the `.bin` file from `build/esp32-apc-nut-server.bin`
+3. Select the `.bin` file from `build/esp32-ups-nut-server.bin`
 4. Upload — the ESP32 reboots automatically
 
 The device keeps two firmware slots (ota_0 and ota_1). A failed update can be rolled back.

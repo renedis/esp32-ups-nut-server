@@ -1,4 +1,4 @@
-# ESP32 APC NUT Server
+# ESP32 UPS NUT Server
 
 A standalone NUT (Network UPS Tools) server on an ESP32 microcontroller. Reads UPS data over USB HID and exposes it via NUT protocol, MQTT, and a web dashboard.
 
@@ -35,8 +35,8 @@ Tested with APC Back-UPS ES 850G2 and CyberPower OR2200LCDRM2U.
 ## Build & Flash
 
 ```bash
-git clone https://github.com/renedis/esp32-apc-nut-server.git
-cd esp32-apc-nut-server
+git clone https://github.com/renedis/esp32-ups-nut-server.git
+cd esp32-ups-nut-server
 source ~/esp/esp-idf/export.sh
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor

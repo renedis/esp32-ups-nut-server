@@ -34,6 +34,8 @@ static const nvs_cfg_t s_defaults = {
     .mqtt_interval = 30,
     .mqtt_qos      = 1,
     .mqtt_ha       = 1,
+    .power_topic   = "",
+    .power_json_key= "",
 };
 
 #define LOAD_STR(h, k, dst) do { \
@@ -79,6 +81,8 @@ esp_err_t nvs_config_init(void)
     LOAD_U32(h, mqtt_interval, s_cfg.mqtt_interval);
     LOAD_U8 (h, mqtt_qos,      s_cfg.mqtt_qos);
     LOAD_U8 (h, mqtt_ha,       s_cfg.mqtt_ha);
+    LOAD_STR(h, power_topic,   s_cfg.power_topic);
+    LOAD_STR(h, power_json_key,s_cfg.power_json_key);
 
     uint8_t en = 0;
     if (nvs_get_u8(h, "mqtt_en", &en) != ESP_OK) en = 0;
@@ -114,6 +118,8 @@ esp_err_t nvs_config_save(const nvs_cfg_t *cfg)
     nvs_set_u32(h, "mqtt_interval", cfg->mqtt_interval);
     nvs_set_u8 (h, "mqtt_qos",      cfg->mqtt_qos);
     nvs_set_u8 (h, "mqtt_ha",       cfg->mqtt_ha);
+    nvs_set_str(h, "power_topic",   cfg->power_topic);
+    nvs_set_str(h, "power_json_key",cfg->power_json_key);
 
     esp_err_t err = nvs_commit(h);
     nvs_close(h);

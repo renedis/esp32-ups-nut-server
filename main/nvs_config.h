@@ -18,6 +18,8 @@ typedef struct {
     uint32_t mqtt_interval;
     uint8_t  mqtt_qos;
     uint8_t  mqtt_ha;
+    char     power_topic[128];    /* HA power sensor state topic for ups.realpower */
+    char     power_json_key[32];  /* JSON key to extract from payload, empty = raw */
 } nvs_cfg_t;
 
 esp_err_t        nvs_config_init(void);

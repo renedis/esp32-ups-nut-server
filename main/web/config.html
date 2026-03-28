@@ -317,6 +317,37 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
 
     <!-- Overrides -->
     <div id="panel-overrides" class="panel">
+      <!-- Power Sensor card -->
+      <div class="card" id="power-card">
+        <div class="card-header">
+          <div class="card-title">Real Power (ups.realpower)</div>
+          <div class="card-subtitle">Use an external power meter via MQTT instead of the calculated value</div>
+        </div>
+        <div id="power-no-mqtt" style="display:none">
+          <div style="color:var(--error);font-size:.85rem">MQTT is not configured. Enable MQTT in the MQTT tab first.</div>
+        </div>
+        <div id="power-no-connect" style="display:none">
+          <div style="color:var(--base-content-muted);font-size:.85rem">MQTT enabled but not connected yet. Waiting for broker to discover sensors...</div>
+        </div>
+        <div id="power-fields" style="display:none">
+          <div class="field">
+            <label for="power-select">Power Sensor</label>
+            <select id="power-select" style="width:100%;background:var(--base-200);border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.55rem .8rem;font-size:.875rem;color:var(--base-content);font-family:inherit">
+              <option value="">-- None (use UPS calculated value) --</option>
+            </select>
+            <div class="field-hint">Discovered from Home Assistant MQTT auto-discovery. Updates in real-time on value change.</div>
+          </div>
+          <div id="power-live" style="font-size:.8rem;margin-top:.5rem"></div>
+          <div class="actions">
+            <button type="button" class="btn btn-primary" onclick="savePowerSensor()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variable overrides card -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">Variable Overrides</div>
@@ -537,21 +568,82 @@ function waitReconnect() {
   }, 2000);
 }
 
+/* ── Power Sensor ── */
+async function loadPowerSensors() {
+  try {
+    const r = await fetch('/api/power_sensors');
+    const d = await r.json();
+
+    const noMqtt = document.getElementById('power-no-mqtt');
+    const noConn = document.getElementById('power-no-connect');
+    const fields = document.getElementById('power-fields');
+
+    if (!d.mqtt_enabled) {
+      noMqtt.style.display = 'block'; noConn.style.display = 'none'; fields.style.display = 'none';
+      return;
+    }
+    if (!d.mqtt_connected) {
+      noMqtt.style.display = 'none'; noConn.style.display = 'block'; fields.style.display = 'none';
+      return;
+    }
+    noMqtt.style.display = 'none'; noConn.style.display = 'none'; fields.style.display = 'block';
+
+    const sel = document.getElementById('power-select');
+    sel.innerHTML = '<option value="">-- None (use UPS calculated value) --</option>';
+    for (const s of d.sensors) {
+      const opt = document.createElement('option');
+      opt.value = s.topic + (s.json_key ? '|' + s.json_key : '');
+      opt.textContent = s.name + ' (' + s.topic + (s.json_key ? ' [' + s.json_key + ']' : '') + ')';
+      if (s.topic === d.selected_topic &&
+          (s.json_key || '') === (d.selected_json_key || ''))
+        opt.selected = true;
+      sel.appendChild(opt);
+    }
+
+    /* Show current live value */
+    const live = document.getElementById('power-live');
+    if (d.selected_topic) {
+      const st = await fetch('/api/status');
+      const sd = await st.json();
+      live.innerHTML = 'Current ups.realpower: <strong style="color:var(--success)">' +
+        (sd['ups.realpower'] || '?') + ' W</strong>';
+    } else {
+      live.innerHTML = '';
+    }
+  } catch(e) { showToast('Failed to load power sensors', 'err'); }
+}
+
+async function savePowerSensor() {
+  const val = document.getElementById('power-select').value;
+  let topic = '', json_key = '';
+  if (val) {
+    const parts = val.split('|');
+    topic = parts[0];
+    json_key = parts[1] || '';
+  }
+  try {
+    const r = await fetch('/api/power_sensor', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({topic, json_key}),
+    });
+    if (!r.ok) throw new Error(r.status);
+    showToast('Power sensor saved', 'ok');
+    setTimeout(loadPowerSensors, 1000);
+  } catch(e) { showToast('Failed to save power sensor', 'err'); }
+}
+
 /* ── Overrides ── */
 let ovrData = {};   /* current saved overrides */
 let ovrVars = {};   /* live variable values */
 
 async function loadOverrides() {
   try {
-    const [statusRes, ovrRes] = await Promise.all([
-      fetch('/api/status'), fetch('/api/overrides')
+    const [statusRes, ovrRes, _] = await Promise.all([
+      fetch('/api/status'), fetch('/api/overrides'), loadPowerSensors()
     ]);
     const status = await statusRes.json();
     ovrData = await ovrRes.json();
 
-    /* Also fetch NUT vars via the list — status has formatted values,
-       but we also need raw NUT var names. Use /api/status keys that
-       don't start with '_' */
     ovrVars = {};
     for (const [k, v] of Object.entries(status)) {
       if (!k.startsWith('_')) ovrVars[k] = String(v);

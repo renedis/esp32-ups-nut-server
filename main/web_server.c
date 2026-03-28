@@ -300,6 +300,87 @@ static esp_err_t handle_api_overrides_post(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ── GET /api/power_sensors ──────────────────────────────────────────── */
+static esp_err_t handle_api_power_sensors(httpd_req_t *req)
+{
+    const nvs_cfg_t *cfg = nvs_config_get();
+    cJSON *root = cJSON_CreateObject();
+
+    cJSON_AddBoolToObject(root, "mqtt_enabled", cfg->mqtt_en && cfg->mqtt_uri[0]);
+    cJSON_AddBoolToObject(root, "mqtt_connected", mqtt_pub_is_connected());
+    cJSON_AddStringToObject(root, "selected_topic", cfg->power_topic);
+    cJSON_AddStringToObject(root, "selected_json_key", cfg->power_json_key);
+
+    const power_sensor_t *sensors;
+    int count = mqtt_get_power_sensors(&sensors);
+    cJSON *arr = cJSON_AddArrayToObject(root, "sensors");
+    for (int i = 0; i < count; i++) {
+        cJSON *s = cJSON_CreateObject();
+        cJSON_AddStringToObject(s, "name",     sensors[i].name);
+        cJSON_AddStringToObject(s, "topic",    sensors[i].topic);
+        cJSON_AddStringToObject(s, "json_key", sensors[i].json_key);
+        cJSON_AddStringToObject(s, "uid",      sensors[i].unique_id);
+        cJSON_AddItemToArray(arr, s);
+    }
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_sendstr(req, json);
+    free(json);
+    return ESP_OK;
+}
+
+/* ── POST /api/power_sensor — select a power sensor ─────────────────── */
+static esp_err_t handle_api_power_sensor_post(httpd_req_t *req)
+{
+    char buf[256];
+    int total = 0, r;
+    while (total < (int)sizeof(buf) - 1) {
+        r = httpd_req_recv(req, buf + total, sizeof(buf) - 1 - total);
+        if (r <= 0) break;
+        total += r;
+    }
+    buf[total] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad JSON");
+        return ESP_FAIL;
+    }
+
+    nvs_cfg_t c;
+    memcpy(&c, nvs_config_get(), sizeof(c));
+
+    cJSON *v;
+    v = cJSON_GetObjectItem(root, "topic");
+    if (v && cJSON_IsString(v))
+        strlcpy(c.power_topic, v->valuestring, sizeof(c.power_topic));
+    else
+        c.power_topic[0] = '\0';
+
+    v = cJSON_GetObjectItem(root, "json_key");
+    if (v && cJSON_IsString(v))
+        strlcpy(c.power_json_key, v->valuestring, sizeof(c.power_json_key));
+    else
+        c.power_json_key[0] = '\0';
+
+    cJSON_Delete(root);
+
+    if (nvs_config_save(&c) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed");
+        return ESP_FAIL;
+    }
+
+    /* Subscribe/unsubscribe immediately */
+    mqtt_subscribe_power_topic(c.power_topic, c.power_json_key);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true}");
+    return ESP_OK;
+}
+
 /* ── Deferred restart task — clean shutdown outside httpd context ──── */
 static void ota_restart_task(void *arg)
 {
@@ -466,6 +547,8 @@ static const httpd_uri_t s_routes[] = {
     { .uri="/api/config", .method=HTTP_POST, .handler=handle_api_config_post },
     { .uri="/api/hid",    .method=HTTP_GET,  .handler=handle_api_hid        },
     { .uri="/api/log",    .method=HTTP_GET,  .handler=handle_api_log        },
+    { .uri="/api/power_sensors",  .method=HTTP_GET,  .handler=handle_api_power_sensors },
+    { .uri="/api/power_sensor",   .method=HTTP_POST, .handler=handle_api_power_sensor_post },
     { .uri="/api/overrides", .method=HTTP_GET,  .handler=handle_api_overrides_get },
     { .uri="/api/overrides", .method=HTTP_POST, .handler=handle_api_overrides_post },
     { .uri="/api/ota",    .method=HTTP_POST, .handler=handle_ota,

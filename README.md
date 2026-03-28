@@ -1,213 +1,172 @@
-# esp32-apc-nut-server
+# ESP32 APC NUT Server
 
-An ESP32-based NUT (Network UPS Tools) server that reads an **APC Back-UPS ES 850G2** (USB `051d:0002`) directly via USB HID and exposes the data over:
+A standalone NUT (Network UPS Tools) server running on an ESP32 microcontroller. It reads APC UPS data directly over USB and makes it available to any NUT client, MQTT broker, or web browser.
 
-- **NUT protocol** (TCP 3493) — compatible with `upsc`, `upsmon`, `nut-monitor`, Home Assistant, and any NUT client
-- **MQTT** with optional Home Assistant auto-discovery
-- **Web UI** (dark-mode dashboard + configuration page)
+## What it does
 
-Designed for the **Waveshare ESP32-P4-ETH** board (wired Ethernet via IP101 PHY). Also supports ESP32-S3 with WiFi.
+Plug your APC UPS USB cable into the ESP32. The ESP32 reads the UPS status over USB HID and shares it via:
 
----
+- **NUT protocol** on TCP port 3493 — works with `upsc`, `upsmon`, NUT-Monitor, NutGUI, Home Assistant, and any other NUT client
+- **Web dashboard** — live view with battery charge, runtime, load, voltage, power, and temperature
+- **Web settings page** — configure everything from the browser (NUT credentials, MQTT, OTA firmware update, serial console)
+- **MQTT** — publish UPS data to any MQTT broker, with optional Home Assistant auto-discovery
+- **OTA firmware update** — upload new firmware from the settings page, no USB cable needed
+
+All settings are saved to flash and survive reboots.
 
 ## Hardware
 
-| Component | Details |
+| What | Details |
 |---|---|
-| MCU | Waveshare ESP32-P4-ETH (RISC-V, dual-core 400 MHz) |
-| Network | Wired Ethernet — IP101 GRI PHY via RMII |
-| UPS connection | USB-A host port → APC Back-UPS USB HID |
-| UPS tested | APC Back-UPS BE850G2 (`051d:0002`, FW 938.a2 .I, 1049-byte HID descriptor) |
-| Also compiles for | ESP32-S3 (WiFi) |
+| Board | Waveshare ESP32-P4-ETH (also works on ESP32-S3 with WiFi) |
+| Network | Wired Ethernet (IP101 PHY) or WiFi on S3 |
+| UPS connection | USB cable from UPS to the ESP32 USB-A host port |
+| Tested with | APC Back-UPS ES 850G2 (USB ID `051d:0002`) |
 
-Connect the UPS USB cable to the ESP32-P4-ETH's USB-A host port. No additional hardware needed.
+No extra components needed. Just the ESP32 board and a USB cable to the UPS.
 
----
+## Supported UPS Brands
 
-## Features
+The firmware includes USB HID subdrivers for:
 
-- Parses the raw USB HID report descriptor at connect time (no hardcoded byte offsets)
-- Polls all relevant FEATURE reports every 2 s (configurable)
-- Exposes standard NUT variables: `ups.status`, `battery.charge`, `battery.runtime`, `input.voltage`, `ups.load`, `battery.charge.warning`, and more
-- NUT `ups.status` flags: `OL`, `OB`, `CHRG`, `DISCHRG`, `LB`, `SD`, `RB`
-- MQTT publish with configurable topic prefix and interval; Home Assistant MQTT discovery
-- Web UI at `http://<ip>/` — live status dashboard
-- Web config at `http://<ip>/config` — NUT credentials, MQTT settings, poll interval; saved to NVS flash
-- All settings survive reboot (NVS)
-- `CONFIG_APC_HID_DEBUG=y` dumps the full parsed HID descriptor on first USB connect (useful for new devices)
+APC, Arduino/Simulator, Belkin, CPS (CyberPower), Delta, Ecoflow, Ever, iDowell, Legrand, MGE/Eaton, OpenUPS, PowerCOM, Powervar, Riello, Salicru, Tripp Lite
 
----
+The USB HID descriptor is parsed at runtime, so new devices that follow the standard USB HID Power Device class should work automatically.
 
-## NUT Variables Reported
+## UPS Data Provided
 
-| NUT variable | Source |
+The following NUT variables are reported (depending on what your UPS supports):
+
+| Variable | What it shows |
 |---|---|
-| `ups.status` | Derived from `ACPresent`, `Charging`, `Discharging`, `BelowRemainingCapLimit`, `ShutdownImminent`, `NeedReplacement` |
-| `battery.charge` | `BS:RemainingCapacity` (RID 0x0c, 8-bit, 0–100%) |
-| `battery.runtime` | `BS:RuntimeToEmpty` (RID 0x0c, 16-bit, seconds) |
-| `input.voltage` | `PD:Voltage` (RID 0x09, 16-bit, ÷10 for display) |
-| `ups.load` | `PD:PercentLoad` (RID 0x50, 8-bit, 0–100%) |
-| `battery.charge.warning` | `BS:WarningCapacityLimit` (RID 0x11, 8-bit) |
-| `device.mfr` | Static: `APC` |
-| `device.model` | Static: `Back-UPS BE850G2` |
-| `ups.vendorid` / `ups.productid` | `051d` / `0002` |
+| `ups.status` | Online, on battery, charging, low battery, etc. (`OL`, `OB`, `CHRG`, `DISCHRG`, `LB`, `RB`, `FSD`) |
+| `battery.charge` | Battery level (0-100%) |
+| `battery.runtime` | Estimated seconds of battery time left |
+| `battery.voltage` | Battery DC voltage |
+| `battery.temperature` | Battery temperature (falls back to ESP32 chip temperature if UPS doesn't report it) |
+| `input.voltage` | Mains input voltage |
+| `ups.load` | UPS load percentage |
+| `ups.realpower` | Actual power draw in watts (calculated from load and nominal power) |
+| `ups.temperature` | UPS internal temperature (falls back to ESP32 chip temperature) |
+| `ups.firmware` | UPS firmware version |
+| `device.serial` | UPS serial number |
+| `ups.mfr` | Manufacturer name |
+| `ups.model` | Model name |
 
----
+## Web Interface
+
+| URL | What you get |
+|---|---|
+| `http://<ip>/` | Dashboard with 6 donut charts: runtime, load, charge, power, voltage, temperature |
+| `http://<ip>/config` | Settings page with tabs: NUT Server, MQTT, Serial Console, Firmware OTA, Development |
+| `http://<ip>/api/status` | Raw JSON with all UPS data |
+| `http://<ip>/api/config` | Current configuration as JSON |
+| `http://<ip>/api/hid` | Parsed USB HID report map (for debugging) |
 
 ## Building
 
-### Prerequisites
+### You need
 
-- [ESP-IDF v5.3.1 or later](https://docs.espressif.com/projects/esp-idf/en/latest/esp32p4/get-started/) (tested with **v5.5.3**)
+- [ESP-IDF v5.3 or later](https://docs.espressif.com/projects/esp-idf/en/latest/esp32p4/get-started/) (tested with v5.5.3)
 - Python 3.8+
 
-### Install ESP-IDF (macOS/Linux)
+### Build steps
 
 ```bash
-# Using Espressif Installation Manager (recommended)
-curl -fsSL https://dl.espressif.com/dl/eim/install.sh | bash
-eim install esp-idf v5.5.3
-
-# Or manually
-git clone --recursive https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-cd ~/esp/esp-idf && git checkout v5.5.3 && ./install.sh esp32p4
-```
-
-### Clone and build
-
-```bash
-git clone https://github.com/<your-user>/esp32-apc-nut-server.git
+git clone https://github.com/renedis/esp32-apc-nut-server.git
 cd esp32-apc-nut-server
 
-source ~/esp/esp-idf/export.sh   # or activate_idf_v5.5.3.sh via EIM
-
+source ~/esp/esp-idf/export.sh
 idf.py build
 ```
 
-The default target is `esp32p4` (set in `sdkconfig.defaults`). To build for ESP32-S3:
+Default target is ESP32-P4. For ESP32-S3:
 
 ```bash
 idf.py set-target esp32s3
-idf.py menuconfig   # APC NUT Server Configuration → Target board → ESP32-S3 (WiFi)
 idf.py build
 ```
 
-### Configuration via menuconfig
-
-```bash
-idf.py menuconfig
-# Navigate to: APC NUT Server Configuration
-```
-
-| Option | Default | Description |
-|---|---|---|
-| Target board | ESP32-P4-ETH | Hardware platform |
-| WiFi SSID / Password | — | ESP32-S3 only |
-| NUT TCP port | 3493 | Standard NUT port |
-| NUT username | `upsmon` | Accepted for NUT LOGIN |
-| NUT password | `secret` | Accepted for NUT LOGIN |
-| UPS poll interval (ms) | 2000 | How often to GET_REPORT from UPS |
-| HID descriptor debug dump | enabled | Dumps parsed descriptor on connect |
-
-All settings can also be changed at runtime via the web config page and are saved to NVS.
-
----
-
-## Flashing
+### Flash
 
 ```bash
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-Replace `/dev/ttyUSB0` with your serial port (`/dev/cu.usbserial-*` on macOS, `COMx` on Windows).
+Replace `/dev/ttyUSB0` with your serial port (`/dev/cu.usbmodem*` on macOS, `COMx` on Windows).
 
-On first boot the ESP32 will:
-1. Initialise NVS with defaults
-2. Bring up Ethernet (or WiFi on S3)
-3. Wait for USB HID device
-4. On APC connect: parse descriptor, start polling, start NUT server + web server
+After flashing, open `http://<ip>/config` in your browser to set the UPS name, NUT credentials, and other options.
 
----
+## Connecting NUT Clients
 
-## Connecting NUT clients
-
-Once running, query with any NUT client:
+### Command line
 
 ```bash
-upsc apc@<ESP32-IP>
-upsc apc@<ESP32-IP> ups.status
-upsc apc@<ESP32-IP> battery.charge
+upsc MyUPS@<ESP32-IP>
+upsc MyUPS@<ESP32-IP> ups.status
+upsc MyUPS@<ESP32-IP> battery.charge
 ```
 
-### upsmon (`/etc/nut/upsmon.conf`)
+Replace `MyUPS` with the UPS name you set in the web settings.
+
+### upsmon
+
+Add to `/etc/nut/upsmon.conf`:
 
 ```
-MONITOR apc@<ESP32-IP> 1 upsmon secret master
+MONITOR MyUPS@<ESP32-IP> 1 <username> <password> master
 ```
 
-### Home Assistant (NUT integration)
+### Home Assistant
 
-Settings → Integrations → Add Integration → **Network UPS Tools (NUT)**
+Settings > Integrations > Add Integration > **Network UPS Tools (NUT)**
 
 - Host: `<ESP32-IP>`
 - Port: `3493`
-- Username: `upsmon`
-- Password: `secret`
+- Username / Password: whatever you set in the web settings
 
----
+## MQTT
 
-## MQTT / Home Assistant auto-discovery
+Enable MQTT in the web settings page. Set the broker URI (e.g. `mqtt://10.0.0.251`), username, password, and topic prefix.
 
-Enable MQTT in the web config page (`http://<ip>/config`) or via `idf.py menuconfig`. When Home Assistant discovery is enabled, the ESP32 publishes discovery payloads to `homeassistant/sensor/ups/<field>/config` and data to `homeassistant/sensor/ups/<field>/state`.
+With Home Assistant discovery enabled, sensors appear automatically in Home Assistant.
 
----
+## OTA Firmware Update
 
-## Web UI
+1. Build new firmware with `idf.py build`
+2. Open `http://<ip>/config` and go to the **Firmware OTA** tab
+3. Select the `.bin` file from `build/esp32-apc-nut-server.bin`
+4. Upload — the ESP32 reboots automatically with the new firmware
 
-| URL | Description |
-|---|---|
-| `http://<ip>/` | Live status dashboard — battery charge, runtime, input voltage, load, status badge |
-| `http://<ip>/config` | Configuration — NUT port/credentials, MQTT broker, poll interval |
-| `http://<ip>/api/status` | JSON status endpoint |
+The device keeps two firmware slots (ota_0 and ota_1) so a failed update can be rolled back.
 
----
-
-## Project structure
+## Project Structure
 
 ```
 main/
-├── apc_ups.c/h        — USB HID host driver, UPS polling, NUT variable store
-├── hid_parser.c/h     — HID report descriptor parser (generic, no APC-specific assumptions)
-├── nut_server.c/h     — NUT protocol TCP server (port 3493)
-├── mqtt_pub.c/h       — MQTT publisher with HA discovery
-├── nvs_config.c/h     — NVS-backed runtime configuration
-├── web_server.c/h     — HTTP server + REST API
-├── main.c             — App entry, network init, task creation
-├── Kconfig.projbuild  — menuconfig options
-├── idf_component.yml  — Component dependencies
-└── web/
-    ├── index.html     — Status dashboard
-    └── config.html    — Configuration page
+├── main.c              — Startup, network init, task creation
+├── ups_driver.c/h      — USB HID host driver, UPS polling
+├── apc_subdriver.c/h   — APC-specific HID variable mapping
+├── hid_parser.c/h      — USB HID report descriptor parser
+├── hid_var_map.c/h     — NUT variable to HID usage mapping
+├── nut_server.c/h      — NUT protocol server (TCP 3493)
+├── mqtt_pub.c/h        — MQTT publisher with HA discovery
+├── nvs_config.c/h      — Settings storage (NVS flash)
+├── web_server.c/h      — HTTP server, REST API, OTA handler
+├── *_subdriver.c       — Additional UPS brand subdrivers
+├── web/
+│   ├── index.html      — Dashboard page
+│   └── config.html     — Settings page
+├── Kconfig.projbuild   — Build-time config options
+└── idf_component.yml   — ESP-IDF component dependencies
+partitions.csv          — Flash partition layout (dual OTA)
+sdkconfig.defaults      — Default build settings
 ```
 
----
+## Security
 
-## Known limitations
+Default NUT credentials should be changed through the web settings page before putting this on your network. Credentials are stored in flash and survive firmware updates.
 
-| NUT variable | Reason unavailable |
-|---|---|
-| `battery.voltage` | `BS:Voltage (0x850030)` not present in APC BE850G2 HID descriptor |
-| `battery.charge.low` | `BS:RemainingCapacityLimit (0x850028)` not in descriptor |
-| `ups.temperature` | `PD:Temperature (0x840036)` not in descriptor |
-| `ups.firmware` | APC exposes firmware only via vendor-specific report (not mapped) |
-| `device.serial` | Not in standard HID descriptor |
+## License
 
-These are device limitations, not firmware bugs. The HID parser will automatically pick up additional fields if a different APC model exposes them.
-
----
-
-## Security note
-
-Default NUT credentials (`upsmon` / `secret`) should be changed via the web config page before deploying on a network. Credentials are stored in NVS flash and survive reflash of the application partition.
-
----
+See [LICENSE](LICENSE) for details.

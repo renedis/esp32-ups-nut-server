@@ -334,8 +334,16 @@ void mqtt_pub_reconfigure(void)
         return;
     }
 
+    /* Auto-prepend mqtt:// if no scheme is given */
+    char uri_buf[160];
+    const char *uri = cfg->mqtt_uri;
+    if (strncmp(uri, "mqtt", 4) != 0 && strncmp(uri, "ws", 2) != 0) {
+        snprintf(uri_buf, sizeof(uri_buf), "mqtt://%s", uri);
+        uri = uri_buf;
+    }
+
     esp_mqtt_client_config_t mc = {
-        .broker.address.uri          = cfg->mqtt_uri,
+        .broker.address.uri          = uri,
         .credentials.username        = cfg->mqtt_user[0] ? cfg->mqtt_user : NULL,
         .credentials.authentication.password = cfg->mqtt_pass[0] ? cfg->mqtt_pass : NULL,
         .session.keepalive           = 60,

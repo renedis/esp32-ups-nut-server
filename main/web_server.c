@@ -108,17 +108,17 @@ static esp_err_t handle_api_status(httpd_req_t *req)
 #define ADDF(key, fmt, val) do { snprintf(buf, sizeof(buf), fmt, val); \
     cJSON_AddStringToObject(root, key, buf); } while(0)
 
-    ADDF("battery.charge",          "%.1f", d.battery_charge);
+    ADDF("battery.charge",          "%.2f", d.battery_charge);
     ADDF("battery.runtime",         "%.0f", d.battery_runtime);
     ADDF("battery.voltage",         "%.2f", d.battery_voltage);
-    ADDF("battery.charge.low",      "%.1f", d.battery_charge_low);
-    ADDF("battery.charge.warning",  "%.1f", d.battery_charge_warning);
-    ADDF("battery.temperature",     "%.1f", d.battery_temperature);
-    ADDF("input.voltage",           "%.1f", d.input_voltage);
-    ADDF("ups.load",                "%.1f", d.ups_load);
-    ADDF("ups.temperature",         "%.1f", d.ups_temperature);
+    ADDF("battery.charge.low",      "%.2f", d.battery_charge_low);
+    ADDF("battery.charge.warning",  "%.2f", d.battery_charge_warning);
+    ADDF("battery.temperature",     "%.2f", d.battery_temperature);
+    ADDF("input.voltage",           "%.2f", d.input_voltage);
+    ADDF("ups.load",                "%.2f", d.ups_load);
+    ADDF("ups.temperature",         "%.2f", d.ups_temperature);
     ADDF("ups.realpower.nominal",   "%.0f", d.ups_realpower_nominal);
-    ADDF("ups.realpower",           "%.0f", d.ups_realpower);
+    ADDF("ups.realpower",           "%.2f", d.ups_realpower);
 #undef ADDF
 
     /* USB debug fields */

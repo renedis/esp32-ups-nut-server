@@ -544,7 +544,7 @@ static void poll_all_vars(void)
             float load_pct = strtof(load_s, NULL);
             float nominal  = strtof(nominal_s, NULL);
             char  pbuf[16];
-            snprintf(pbuf, sizeof(pbuf), "%.0f", load_pct * nominal / 100.0f);
+            snprintf(pbuf, sizeof(pbuf), "%.2f", load_pct * nominal / 100.0f);
             set_var("ups.realpower", pbuf);
         }
     }

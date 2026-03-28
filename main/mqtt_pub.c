@@ -209,7 +209,7 @@ static void handle_power_data(const char *data, int data_len)
             cJSON *v = cJSON_GetObjectItem(root, s_subscribed_json_key);
             if (v) {
                 if (cJSON_IsNumber(v))
-                    snprintf(val, sizeof(val), "%.0f", v->valuedouble);
+                    snprintf(val, sizeof(val), "%.2f", v->valuedouble);
                 else if (cJSON_IsString(v))
                     strlcpy(val, v->valuestring, sizeof(val));
             }

@@ -1,3 +1,5 @@
+/* ESP32 UPS NUT Server — Copyright (c) 2026 renedis — GPL-3.0 */
+
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>

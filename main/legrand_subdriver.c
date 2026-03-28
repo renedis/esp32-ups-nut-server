@@ -1,3 +1,5 @@
+/* ESP32 UPS NUT Server — Copyright (c) 2026 renedis — GPL-3.0 */
+
 #include "ups_subdriver.h"
 #include "hid_var_map.h"
 

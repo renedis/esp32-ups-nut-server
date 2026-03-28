@@ -1,3 +1,5 @@
+/* ESP32 UPS NUT Server — Copyright (c) 2026 renedis — GPL-3.0 */
+
 #include "hid_parser.h"
 #include <string.h>
 #include "esp_log.h"

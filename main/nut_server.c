@@ -1,3 +1,5 @@
+/* ESP32 UPS NUT Server — Copyright (c) 2026 renedis — GPL-3.0 */
+
 #include "nut_server.h"
 #include "ups_driver.h"
 #include "nvs_config.h"

@@ -1,0 +1,89 @@
+<!-- ESP32 UPS NUT Server — Copyright (c) 2026 renedis — GPL-3.0 -->
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Firmware Update</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#1e2130;color:#cdd6f4;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem}
+.card{background:#2a2d3e;border-radius:12px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+h1{font-size:1.2rem;font-weight:600;margin-bottom:1.5rem;color:#89b4fa}
+a{color:#89b4fa;text-decoration:none;font-size:.85rem}
+a:hover{text-decoration:underline}
+.drop{border:2px dashed #45475a;border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:1rem}
+.drop.hover{border-color:#89b4fa;background:#313244}
+.drop input{display:none}
+.drop-label{font-size:.9rem;color:#6c7086}
+.drop-name{font-size:.85rem;color:#a6e3a1;margin-top:.5rem;word-break:break-all}
+progress{width:100%;height:8px;border-radius:4px;appearance:none;-webkit-appearance:none;margin-bottom:.75rem;display:none}
+progress::-webkit-progress-bar{background:#313244;border-radius:4px}
+progress::-webkit-progress-value{background:#89b4fa;border-radius:4px;transition:width .1s}
+.btn{width:100%;padding:.65rem;border:none;border-radius:8px;background:#89b4fa;color:#1e2130;font-weight:700;font-size:.95rem;cursor:pointer;transition:opacity .15s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.status{margin-top:.75rem;font-size:.85rem;min-height:1.2em;text-align:center}
+.ok{color:#a6e3a1}.err{color:#f38ba8}
+nav{margin-bottom:1.5rem;align-self:flex-start}
+</style>
+</head>
+<body>
+<nav><a href="/">← Back to dashboard</a></nav>
+<div class="card">
+  <h1>Firmware OTA Update</h1>
+  <div class="drop" id="drop">
+    <input type="file" id="file" accept=".bin">
+    <div class="drop-label">Drop .bin file here or click to browse</div>
+    <div class="drop-name" id="fname"></div>
+  </div>
+  <progress id="prog" max="100" value="0"></progress>
+  <button class="btn" id="btn" disabled>Upload &amp; Flash</button>
+  <div class="status" id="status"></div>
+</div>
+<script>
+const drop=document.getElementById('drop'),fileIn=document.getElementById('file'),
+      fname=document.getElementById('fname'),btn=document.getElementById('btn'),
+      prog=document.getElementById('prog'),status=document.getElementById('status');
+
+drop.addEventListener('click',()=>fileIn.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('hover')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('hover'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('hover');fileIn.files=e.dataTransfer.files;onFile()});
+fileIn.addEventListener('change',onFile);
+
+function onFile(){
+  if(!fileIn.files.length)return;
+  fname.textContent=fileIn.files[0].name+' ('+Math.round(fileIn.files[0].size/1024)+' KB)';
+  btn.disabled=false;status.textContent='';
+}
+
+btn.addEventListener('click',()=>{
+  if(!fileIn.files.length)return;
+  const f=fileIn.files[0];
+  btn.disabled=true;prog.style.display='block';prog.value=0;
+  status.textContent='Uploading…';status.className='status';
+
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST','/api/ota');
+  xhr.upload.onprogress=e=>{if(e.lengthComputable){prog.value=Math.round(e.loaded/e.total*100)}};
+  xhr.onload=()=>{
+    if(xhr.status===200){
+      prog.value=100;
+      status.textContent='✓ Flash complete — rebooting…';status.className='status ok';
+      setTimeout(()=>{status.textContent='Reconnecting…';tryReconnect()},3000);
+    }else{
+      status.textContent='Error: '+xhr.responseText;status.className='status err';
+      btn.disabled=false;
+    }
+  };
+  xhr.onerror=()=>{status.textContent='Upload failed';status.className='status err';btn.disabled=false;};
+  xhr.send(f);
+});
+
+function tryReconnect(){
+  fetch('/').then(r=>{if(r.ok)window.location='/'}).catch(()=>setTimeout(tryReconnect,2000));
+}
+</script>
+</body>
+</html>

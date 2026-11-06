@@ -20,7 +20,7 @@ static const char *TAG = "nut_server";
 #define RX_BUF_SIZE  256
 #define TX_BUF_SIZE  1024
 
-/* Returns the configured UPS name (from NVS, e.g. "RD-UPS01"). */
+/* Returns the configured UPS name (from NVS, e.g. "UPS-1"). */
 static const char *nut_ups_name(void) { return nvs_config_get()->ups_name; }
 
 typedef struct {

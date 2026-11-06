@@ -83,6 +83,11 @@ static esp_err_t network_init(void)
             .ssid     = CONFIG_APC_NUT_WIFI_SSID,
             .password = CONFIG_APC_NUT_WIFI_PASSWORD,
             .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            /* Scan every channel and join the strongest AP, not the first
+             * one heard (the default fast scan can stick to a distant AP
+             * in a multi-AP network). */
+            .scan_method = WIFI_ALL_CHANNEL_SCAN,
+            .sort_method = WIFI_CONNECT_AP_BY_SIGNAL,
         },
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));

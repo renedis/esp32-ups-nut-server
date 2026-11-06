@@ -55,14 +55,17 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED) {
+        s_wifi_retry = 0;
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_wifi_retry < WIFI_MAX_RETRIES) {
-            esp_wifi_connect();
-            s_wifi_retry++;
-            ESP_LOGW(TAG, "WiFi reconnecting (%d/%d)", s_wifi_retry, WIFI_MAX_RETRIES);
-        } else {
+        /* Keep reconnecting for ever: services keep running without the
+         * network, so giving up would leave the server offline until a
+         * reboot. After WIFI_MAX_RETRIES failures in a row only flag the
+         * failure, so the boot-time wait in network_init() can return. */
+        if (++s_wifi_retry == WIFI_MAX_RETRIES)
             xEventGroupSetBits(s_net_event_group, NET_FAIL_BIT);
-        }
+        ESP_LOGW(TAG, "WiFi reconnecting (attempt %d)", s_wifi_retry);
+        esp_wifi_connect();
     }
 }
 

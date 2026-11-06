@@ -27,12 +27,18 @@
 }
 html{font-size:16px;background:var(--base-300);color:var(--base-content);font-family:var(--font);min-height:100vh}
 a{color:inherit;text-decoration:none}
-.navbar{background:var(--base-200);border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;position:sticky;top:0;z-index:90;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.navbar{background:var(--base-200);border-bottom:1px solid var(--border-color);display:flex;flex-wrap:wrap;row-gap:.5rem;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;position:sticky;top:0;z-index:90;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .navbar-brand{display:flex;align-items:center;gap:.6rem;font-size:1.1rem;font-weight:700;letter-spacing:-.01em}
 .navbar-center{display:flex;gap:.25rem}
 .nav-link{display:flex;align-items:center;gap:.4rem;font-size:.875rem;font-weight:500;color:var(--base-content-muted);padding:.4rem .75rem;border-radius:var(--radius-field);transition:all .15s}
 .nav-link:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
 .nav-link.active{color:var(--base-content);background:rgba(255,255,255,.08)}
+.peers{display:flex;align-items:center;min-width:0}
+.peers[hidden]{display:none}
+.peer-select{appearance:none;-webkit-appearance:none;color-scheme:dark;max-width:10rem;background:var(--base-100) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%23888daa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right .6rem center;border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.3rem 1.8rem .3rem .7rem;font-family:inherit;font-size:.8rem;font-weight:600;color:var(--base-content);text-overflow:ellipsis;cursor:pointer;outline:none;transition:border-color .15s,box-shadow .15s}
+.peer-select:hover{border-color:rgba(255,255,255,.2)}
+.peer-select:focus-visible{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+@media(max-width:640px){.navbar-end{margin-left:auto}.peer-select{max-width:11rem;font-size:16px}}
 .layout{display:flex;max-width:1100px;margin:0 auto;padding:1.5rem;gap:1.5rem;min-height:calc(100vh - 56px)}
 .sidebar{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:.2rem;position:sticky;top:72px;align-self:flex-start}
 .sidebar-btn{display:flex;align-items:center;gap:.6rem;font-size:.85rem;font-weight:500;color:var(--base-content-muted);padding:.6rem .85rem;border-radius:var(--radius-box);border:none;background:none;cursor:pointer;transition:all .15s;text-align:left;font-family:inherit;width:100%}
@@ -50,10 +56,11 @@ a{color:inherit;text-decoration:none}
 .field{margin-bottom:1.1rem}
 .field:last-child{margin-bottom:0}
 .field label{display:block;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--base-content-muted);margin-bottom:.4rem}
-.field input,.field select{width:100%;background:var(--base-200);border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.55rem .8rem;font-size:.875rem;color:var(--base-content);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s}
-.field input:focus,.field select:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.field input,.field select,.field textarea{width:100%;background:var(--base-200);border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.55rem .8rem;font-size:.875rem;color:var(--base-content);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
 .field input[type="number"]{font-family:var(--font-mono)}
-.field input::placeholder{color:rgba(232,237,248,.25)}
+.field input::placeholder,.field textarea::placeholder{color:rgba(232,237,248,.25)}
+.field textarea{font-family:var(--font-mono);line-height:1.5;resize:vertical}
 .field-row{display:grid;gap:.9rem;grid-template-columns:1fr 1fr}
 .field-hint{font-size:.7rem;color:var(--base-content-muted);margin-top:.3rem;opacity:.7}
 .field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%23888daa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .8rem center}
@@ -111,6 +118,7 @@ progress::-webkit-progress-value{background:#89b4fa;border-radius:4px;transition
 .badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
 footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;color:var(--base-content-muted);border-top:1px solid var(--border-color)}
 </style>
+<script src="/peers.js" defer></script>
 </head>
 <body>
 
@@ -130,6 +138,7 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
     </a>
   </div>
   <div class="navbar-end">
+    <nav id="peers" class="peers" hidden aria-label="Peers"></nav>
     <span class="badge badge-neutral" id="status-badge"><span class="dot"></span><span id="status-text">Connecting</span></span>
   </div>
 </nav>
@@ -143,6 +152,10 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
     <button class="sidebar-btn" onclick="showPanel('mqtt')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       MQTT
+    </button>
+    <button class="sidebar-btn" onclick="showPanel('peers')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Peers
     </button>
     <button class="sidebar-btn" onclick="showPanel('console')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -288,6 +301,27 @@ footer{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 2rem;font-size:.75rem;
           </button>
         </div>
       </form>
+    </div>
+
+    <!-- Peers -->
+    <div id="panel-peers" class="panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Peers</div>
+          <div class="card-subtitle">A drop-down at the top right of every page that opens your other devices. Paste the same list on each device: the entry named like this device (its UPS name) is shown as the current one.</div>
+        </div>
+        <div class="field">
+          <label for="peers-text">Peer list</label>
+          <textarea id="peers-text" rows="8" spellcheck="false" autocomplete="off" placeholder="UPS-1=http://192.168.1.10/&#10;UPS-2=http://192.168.1.11/"></textarea>
+          <div class="field-hint">One Label=URL per line, at most 12. Label: 1&ndash;24 letters, digits, spaces, _ . or -. URL: http:// or https://, at most 96 characters. The menu stays hidden until the list holds another device.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="peers-save">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save &amp; Apply
+        </button>
+      </div>
     </div>
 
     <!-- Serial Console -->
@@ -491,6 +525,32 @@ const mqttEn = document.getElementById('mqtt_en');
 mqttEn.addEventListener('change', () => {
   document.getElementById('mqtt-toggle-label').textContent = mqttEn.checked ? 'Enabled' : 'Disabled';
   document.getElementById('mqtt-fields').classList.toggle('disabled-overlay', !mqttEn.checked);
+});
+
+/* ── Peers ── */
+function peersText(d) { return d.peers.map(p => p.name + '=' + p.url).join('\n'); }
+
+async function loadPeers() {
+  try {
+    const r = await fetch('/api/peers', {cache: 'no-store'});
+    if (r.ok) document.getElementById('peers-text').value = peersText(await r.json());
+  } catch(e) {}
+}
+
+document.getElementById('peers-save').addEventListener('click', async () => {
+  const ta = document.getElementById('peers-text');
+  const peers = ta.value.split('\n').map(l => l.trim()).filter(Boolean).join(';');
+  try {
+    const r = await fetch('/api/peers', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({peers}),
+    });
+    if (!r.ok) { showToast((await r.text()) || 'Save failed', 'err'); return; }
+    const d = await r.json();
+    ta.value = peersText(d);
+    if (typeof peersRender === 'function') peersRender(d);
+    showToast('Peers saved \u2014 applied', 'ok');
+  } catch(e) { showToast('Save failed', 'err'); }
 });
 
 /* ── Serial Console ── */
@@ -732,6 +792,7 @@ setInterval(refreshStatus, 5000);
 
 /* ── Init ── */
 loadConfig();
+loadPeers();
 startLogPoll();
 refreshStatus();
 </script>

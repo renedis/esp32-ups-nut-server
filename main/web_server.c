@@ -13,6 +13,7 @@
 #include "ups_driver.h"
 #include "nvs_config.h"
 #include "mqtt_pub.h"
+#include "peers_web.h"
 #include "web_server.h"
 
 static const char *TAG = "web";
@@ -573,7 +574,7 @@ esp_err_t web_server_start(void)
 
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port      = 80;
-    cfg.max_uri_handlers = 16;
+    cfg.max_uri_handlers = 20;
     cfg.stack_size       = 16384;
     cfg.lru_purge_enable = true;
     cfg.ctrl_port        = 32769;  /* avoid potential bind conflict after OTA reboot */
@@ -581,6 +582,8 @@ esp_err_t web_server_start(void)
     ESP_ERROR_CHECK(httpd_start(&s_server, &cfg));
     for (int i = 0; i < (int)(sizeof(s_routes)/sizeof(s_routes[0])); i++)
         httpd_register_uri_handler(s_server, &s_routes[i]);
+    /* Peer menu; "self" is the UPS name (live string, follows config changes) */
+    peers_web_start(s_server, "nut_cfg", nvs_config_get()->ups_name);
 
     /* Hook ESP_LOG into ring buffer AFTER server is fully started */
     s_orig_vprintf = esp_log_set_vprintf(log_vprintf);

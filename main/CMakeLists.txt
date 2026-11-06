@@ -24,8 +24,11 @@ idf_component_register(
         "nvs_config.c"
         "web_server.c"
         "mqtt_pub.c"
+        "peers.c"
+        "peers_web.c"
     INCLUDE_DIRS "."
     EMBED_TXTFILES
         "web/index.html"
         "web/config.html"
+        "web/peers.js"
 )

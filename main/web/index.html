@@ -27,13 +27,19 @@
 }
 html{font-size:16px;background:var(--base-300);color:var(--base-content);font-family:var(--font);min-height:100vh}
 a{color:inherit;text-decoration:none}
-.navbar{background:var(--base-200);border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;position:sticky;top:0;z-index:90;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.navbar{background:var(--base-200);border-bottom:1px solid var(--border-color);display:flex;flex-wrap:wrap;row-gap:.5rem;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;position:sticky;top:0;z-index:90;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .navbar-brand{display:flex;align-items:center;gap:.6rem;font-size:1.1rem;font-weight:700;letter-spacing:-.01em}
 .navbar-center{display:flex;gap:.25rem}
 .navbar-end{display:flex;align-items:center;gap:.75rem}
 .nav-link{display:flex;align-items:center;gap:.4rem;font-size:.875rem;font-weight:500;color:var(--base-content-muted);padding:.4rem .75rem;border-radius:var(--radius-field);transition:all .15s}
 .nav-link:hover{color:var(--base-content);background:rgba(255,255,255,.06)}
 .nav-link.active{color:var(--base-content);background:rgba(255,255,255,.08)}
+.peers{display:flex;align-items:center;min-width:0}
+.peers[hidden]{display:none}
+.peer-select{appearance:none;-webkit-appearance:none;color-scheme:dark;max-width:10rem;background:var(--base-100) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%23888daa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right .6rem center;border:1px solid var(--border-color);border-radius:var(--radius-field);padding:.3rem 1.8rem .3rem .7rem;font-family:inherit;font-size:.8rem;font-weight:600;color:var(--base-content);text-overflow:ellipsis;cursor:pointer;outline:none;transition:border-color .15s,box-shadow .15s}
+.peer-select:hover{border-color:rgba(255,255,255,.2)}
+.peer-select:focus-visible{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+@media(max-width:640px){.navbar-end{margin-left:auto}.peer-select{max-width:11rem;font-size:16px}}
 .badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .7rem;border-radius:999px;border:1px solid}
 .badge-success{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.3);color:var(--success)}
 .badge-warning{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);color:var(--warning)}
@@ -67,6 +73,7 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
 @media(max-width:960px){.donut-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.page{padding:1.25rem 1rem}.navbar-center{display:none}.donut-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
+<script src="/peers.js" defer></script>
 </head>
 <body>
 
@@ -86,6 +93,7 @@ footer{max-width:1200px;margin:1.5rem auto 0;padding:1rem 1.5rem 2rem;display:fl
     </a>
   </div>
   <div class="navbar-end">
+    <nav id="peers" class="peers" hidden aria-label="Peers"></nav>
     <span class="badge badge-neutral" id="status-badge"><span class="dot"></span><span id="status-text">Connecting</span></span>
   </div>
 </nav>

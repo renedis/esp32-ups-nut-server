@@ -9,3 +9,7 @@ managed_components/
 # Project-specific exclusions
 emulator/
 demo/
+
+# Host unit test binaries
+tests/host/test_*
+!tests/host/test_*.c

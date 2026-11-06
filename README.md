@@ -14,7 +14,8 @@ A standalone NUT (Network UPS Tools) server on an ESP32 microcontroller. Reads U
 
 - **NUT server** (TCP 3493) — works with upsc, upsmon, NutGUI, Home Assistant
 - **Web dashboard** — live donut charts for charge, load, runtime, power, voltage, temperature
-- **Web settings** — NUT, MQTT, serial console, OTA firmware update, variable overrides
+- **Web settings** — NUT, MQTT, peers, serial console, OTA firmware update, variable overrides
+- **Peers menu** — drop-down in the navbar that opens your other devices (one `Label=URL` list for all of them)
 - **MQTT** — publish to any broker with optional Home Assistant auto-discovery
 - **Power meter** — override ups.realpower with a real MQTT power sensor from Home Assistant
 - **OTA updates** — upload new firmware from the browser

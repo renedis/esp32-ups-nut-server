@@ -92,13 +92,15 @@ The following variables are reported depending on what the connected UPS support
 | URL | Description |
 |---|---|
 | `http://<ip>/` | Dashboard with 6 donut charts: Runtime, Load, Charge, Power, Voltage, Temperature |
-| `http://<ip>/config` | Settings with tabs: NUT Server, MQTT, Serial Console, Firmware OTA, Overrides, Development |
+| `http://<ip>/config` | Settings with tabs: NUT Server, MQTT, Peers, Serial Console, Firmware OTA, Overrides, Development |
 | `http://<ip>/api/status` | JSON with all UPS data |
 | `http://<ip>/api/config` | Current configuration as JSON |
 | `http://<ip>/api/overrides` | Variable overrides as JSON |
 | `http://<ip>/api/power_sensors` | Discovered MQTT power sensors |
 | `http://<ip>/api/hid` | Parsed USB HID report map (for debugging) |
 | `http://<ip>/api/log` | Serial console ring buffer |
+| `http://<ip>/api/peers` | Peer list as JSON (`POST` replaces it, see [Peers Menu](#peers-menu)) |
+| `http://<ip>/peers.js` | Peer menu script, included by every page |
 
 ## Building
 
@@ -176,6 +178,22 @@ The Overrides tab lets you feed `ups.realpower` from an external MQTT power mete
 
 The Overrides tab shows all NUT variables with their live values and lets you override any of them. Overrides are stored in flash and apply to the NUT server, MQTT, and web API.
 
+## Peers Menu
+
+A drop-down at the top right of every page opens your other devices in the same tab. Set the list in the **Peers** tab of the settings page, one `Label=URL` per line:
+
+```
+UPS-1=http://192.168.1.10/
+UPS-2=http://192.168.1.11/
+NAS=http://192.168.1.20:8080/
+```
+
+Paste the same list on every device: the entry whose label equals this device's UPS name (ignoring case) is shown as the current one; without a match a "Peers" placeholder is shown. The menu is hidden while the list holds no other device. The list is empty by default, stored in flash (NVS namespace `nut_cfg`, key `peers`) and applied without a reboot.
+
+Rules: label 1-24 characters `[A-Za-z0-9 _.-]`; URL at most 96 characters, starting with `http://` or `https://`, without spaces, quotes or `<>`; at most 12 entries and 512 characters in total. A repeated label (any case) keeps the first entry.
+
+API: `GET /api/peers` returns `{"self":"UPS-1","peers":[{"name":"UPS-1","url":"http://192.168.1.10/"},...]}`. `POST /api/peers` with `{"peers":"UPS-1=http://192.168.1.10/;UPS-2=http://192.168.1.11/"}` validates, saves and applies the list and returns the same JSON, or HTTP 400 with the reason.
+
 ## OTA Firmware Update
 
 1. Build new firmware with `idf.py build`
@@ -211,12 +229,16 @@ main/
 ├── mqtt_pub.c/h          — MQTT publisher, HA discovery, power sensor
 ├── nvs_config.c/h        — Settings and override storage (NVS flash)
 ├── web_server.c/h        — HTTP server, REST API, OTA handler
+├── peers.c/h             — Peer list parser and validator (pure C, host-tested)
+├── peers_web.c/h         — Peer list storage, /api/peers and /peers.js
 ├── web/
 │   ├── index.html        — Dashboard page
-│   └── config.html       — Settings page
+│   ├── config.html       — Settings page
+│   └── peers.js          — Peer menu, included by every page
 ├── Kconfig.projbuild     — Build-time config options
 └── idf_component.yml     — ESP-IDF component dependencies
 partitions.csv            — Flash partition layout (dual OTA)
+tests/host/               — Host unit tests for the pure-C modules (make -C tests/host)
 sdkconfig.defaults        — Default build settings
 ```
 

@@ -22,7 +22,7 @@ function peersRender(d) {
     if (mine && current) return;                                  /* one "you are here" */
     if (!mine && !/^https?:\/\/[^\s"'<>`]+$/.test(url)) return;   /* never a javascript: URL */
     const o = document.createElement('option');
-    o.textContent = name;
+    o.textContent = name.toUpperCase();
     o.value = url;
     sel.appendChild(o);
     if (mine) current = o; else others++;
